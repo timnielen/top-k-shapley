@@ -178,13 +178,14 @@ class GlobalFeatureImportance(Game):
         return self.values[coalition_to_index(np.array(S))]
     def reindex(self):
         values = np.zeros((2**self.n))
-        for i in range(1, 2**self.n): ## the 1 is only because we have an EMPTY_SET entry that cant be parsed
-            coalition = index_to_coalition(i)
-            name = "|".join(coalition.astype('str'))
-            val = self.df[self.df.coalition == name]["value"]
-            values[i] = val.to_numpy()[0]
-            if i%1000 == 0:
-                print(i)
+        for index, row in self.df.iterrows():
+            if index == 0:
+                continue
+            coalition = np.array(row["coalition"].split('|'), dtype=int)
+            coalition_index = coalition_to_index(coalition)
+            values[coalition_index] = row["value"]
+            if index%1000 == 0:
+                print(index)
         return values
     def exact_calculation(self):
         weights = np.zeros(self.n)
