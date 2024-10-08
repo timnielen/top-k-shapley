@@ -54,8 +54,11 @@ class HalfBUS(Algorithm):
         
 
 def binom(n, k):
+    # try:
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
-    
+    # except:
+    #     print(n, k)
+    #     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 
 class SIRHalfBUS(Algorithm):
     def sample(self, dont=np.array([])):
@@ -79,9 +82,17 @@ class SIRHalfBUS(Algorithm):
         t = np.zeros(n)
         self.v_n = self.value(np.arange(n))
         pre_samples = 100
+        total_weights = 0
+        radius = 2
+        num_query_players = 2*radius
+        for l in range(n+1):
+            for w in range(max(0, l-n+num_query_players), min(num_query_players, l)+1):
+                total_weights += (w+1) * binom(num_query_players, w) * binom(n-num_query_players, l-w)
+                # except:
+                #     print(l,w)
+                #     total_weights += (w+1) * binom(num_query_players, w) * binom(n-num_query_players, l-w)
         coalition_weights = np.array([1/((n+1)*binom(n, l)) for l in range(n+1)])
         while self.func_calls+1 < self.T:
-            radius = 2
             p_k = np.argsort(-self.phi)[k-radius:k+radius]
             lengths = np.random.randint(n+1, size=(pre_samples))
             samples = np.mgrid[0:pre_samples, 0:n][1]
@@ -89,12 +100,12 @@ class SIRHalfBUS(Algorithm):
                 np.random.shuffle(samples[i])
                 samples[i, lengths[i]:] = -1
             #print(samples)
-            weights_pre = (np.isin(samples, p_k).sum(axis=1)+1) 
-            weights = weights_pre #/ coalition_weights[lengths]
+            pdf = (np.isin(samples, p_k).sum(axis=1)+1) / total_weights
+            weights = pdf #/ coalition_weights[lengths]
             selected_coalition_index = np.random.choice(np.arange(pre_samples), p=weights/np.sum(weights))
             length = lengths[selected_coalition_index]
             S = samples[selected_coalition_index, :length]
-            coalition_weight = weights_pre[selected_coalition_index] / np.sum(weights_pre)
+            coalition_weight = pdf[selected_coalition_index]
             
             v = self.get_value(S)
             for p in range(n):
@@ -107,6 +118,7 @@ class SIRHalfBUS(Algorithm):
                 else:
                     marginal = self.get_value(np.concatenate((S, [p]))) - v
                     # marginal *= coalition_weights_out[len(S)] / (currWeight/total_weights)
+                # marginal *=  coalition_weights[length] / coalition_weight
                 marginal /=  coalition_weight
                 self.phi[p] = (t[p]*self.phi[p]+marginal)/(t[p]+1)
                 t[p] += 1
