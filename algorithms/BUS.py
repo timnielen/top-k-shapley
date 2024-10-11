@@ -16,14 +16,14 @@ class BUS(Algorithm):
             length = np.random.choice(np.arange(n))
             S = np.concatenate((np.arange(i), np.arange(i+1, n)))
             np.random.shuffle(S)
-            return list(S[:length])
+            return S[:length]
         
         for i in range(n):
             if(self.func_calls+2 > self.T):
                 break
             S = sample(i)
             t[i] += 1
-            self.phi[i] = self.value(S + [i]) - self.value(S)
+            self.phi[i] = self.value(np.concatenate((S, [i]))) - self.value(S)
             self.save_steps(step_interval)
 
 
@@ -34,6 +34,6 @@ class BUS(Algorithm):
             i = np.argmin([delta[j] * t[j] for j in range(n)])
             t[i] += 1
             S = sample(i)
-            phi_new = self.value(S + [i]) - self.value(S)
+            phi_new = self.value(np.concatenate((S, [i]))) - self.value(S)
             self.phi[i] = ((t[i]-1)*self.phi[i] + phi_new)/t[i]
             self.save_steps(step_interval)

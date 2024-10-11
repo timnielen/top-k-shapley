@@ -18,23 +18,23 @@ class SVARM(Algorithm):
             length = np.random.choice(np.arange(n))
             S = np.concatenate((np.arange(i), np.arange(i+1,n)))
             np.random.shuffle(S)
-            return list(S[:length])
+            return S[:length]
         H_n = sum([1/k for k in range(1,n+1)])
         def P_plus():
             length = np.random.choice(np.arange(1,n+1), p=[1/(l*H_n) for l in range(1,n+1)])
             S = np.arange(n)
             np.random.shuffle(S)
-            return list(S[:length])
+            return S[:length]
         def P_minus():
             length = np.random.choice(np.arange(n), p=[1/((n-l)*H_n) for l in range(n)])
             S = np.arange(n)
             np.random.shuffle(S)
-            return list(S[:length])
+            return S[:length]
         #WarmUp
         for i in range(n):
             A_plus = P_w(i)
             A_minus = P_w(i)
-            phi_plus[i] = self.value(A_plus + [i])
+            phi_plus[i] = self.value(np.concatenate((A_plus, [i])))
             phi_minus[i] = self.value(A_minus)
             self.phi = np.array(phi_plus) - np.array(phi_minus)
             self.save_steps(step_interval)

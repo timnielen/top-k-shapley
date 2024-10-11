@@ -208,18 +208,15 @@ class GlobalFeatureImportance(Game):
 class LocalFeatureImportance(Game):
     def initialize(self, n):
         games = os.listdir(self.directory)
+        games = [filename for filename in games if filename.split(".")[-1] == "csv"]
         game = np.random.choice(games)
-        game = "688.csv"
+        # game = "688.csv"
+        print(game)
         filepath = f"{self.directory}/{game}"
         self.n = n
-    def __init__(self, directory, num_players, use_cached=True):
-        self.directory = directory
-        self.n = num_players
-        game = "688.csv"
-        filepath = f"{self.directory}/{game}"
         values_path = f"{filepath.split('.')[0]}_values.npy"
         shapley_values_path = f"{filepath.split('.')[0]}_shapley_values_phi.npy"
-        if use_cached:
+        if self.use_cached:
             try:
                 self.values = np.load(values_path)
             except:
@@ -241,8 +238,12 @@ class LocalFeatureImportance(Game):
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
             
-        print(self.values)
-        print(self.phi, np.sum(self.phi))
+        # print(self.values)
+        # print(self.phi, np.sum(self.phi))
+    def __init__(self, directory, num_players, use_cached=True):
+        self.directory = directory
+        self.n = num_players
+        self.use_cached = use_cached
         
     def reindex(self):
         values = np.zeros((2**self.n))
