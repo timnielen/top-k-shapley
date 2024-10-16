@@ -47,7 +47,7 @@ class Environment:
         variance_mse = np.sum((mse-avg_mse)**2, axis=0)/(rounds-1)
         SE_prec = np.sqrt(variance_prec/rounds)
         SE_mse = np.sqrt(variance_mse/rounds)
-        avg_percentage = np.average(precisions, axis=0)
+        avg_percentage = np.average(percentage, axis=0)
         SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
 
         return avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage

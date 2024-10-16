@@ -18,7 +18,7 @@ class Game:
         border = phi[sorted[k-1]]
         relevant_players = sorted[:k-1][phi[sorted[:k-1]] > border]
         candidates = sorted[k-1:][phi[sorted[k-1:]] == border]
-        sum_topk = np.sum(sorted[:k])
+        sum_topk = np.sum(phi[sorted[:k]])
         return relevant_players, candidates, sum_topk
 
 
