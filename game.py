@@ -13,9 +13,13 @@ class Game:
         pass
     def get_top_k(self, k: int):
         assert k > 0
-        values = np.array([self.get_phi(i) for i in range(self.n)])
-        top_k = np.argpartition(values, -k)
-        return [i for i in top_k if i in top_k[-k:] or values[i] == values[self.n-k]]
+        phi = np.array([self.get_phi(i) for i in range(self.n)])
+        sorted = np.argsort(-phi)
+        border = phi[sorted[k-1]]
+        relevant_players = sorted[:k-1][phi[sorted[:k-1]] > border]
+        candidates = sorted[k-1:][phi[sorted[k-1:]] == border]
+        sum_topk = np.sum(sorted[:k])
+        return relevant_players, candidates, sum_topk
 
 
 class ShoeGame(Game):
@@ -140,6 +144,8 @@ def index_to_coalition(index):
     return np.where(np.unpackbits(view, bitorder='little'))[0]
 
 def coalition_to_index(coalition):
+    if(coalition.shape[0] == 0):
+        return 0
     return np.sum(1 << coalition)
 
 
@@ -211,7 +217,7 @@ class LocalFeatureImportance(Game):
         games = [filename for filename in games if filename.split(".")[-1] == "csv"]
         game = np.random.choice(games)
         # game = "688.csv"
-        print(game)
+        # print(game)
         filepath = f"{self.directory}/{game}"
         self.n = n
         values_path = f"{filepath.split('.')[0]}_values.npy"

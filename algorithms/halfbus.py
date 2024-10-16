@@ -20,6 +20,7 @@ class HalfBUS(Algorithm):
         self.phi = np.zeros(n)
         t = np.zeros(n)
         v_n = self.value(np.arange(n))
+        v_0 = self.value(np.array([]))
         def sample():
             length = np.random.choice(np.arange(n+1))
             S = np.arange(n)
@@ -33,7 +34,7 @@ class HalfBUS(Algorithm):
             S = sample()
             l = len(S)
             if l == 0:
-                v = 0
+                v = v_0
             elif l == n:
                 v = v_n
             else:

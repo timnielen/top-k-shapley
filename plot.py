@@ -13,14 +13,17 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
         axes = [axes]
     axes = {types[i]: axes[i] for i in range(len(types))}   
 
-    for name, (topk_precision, topk_SE, precision, SE) in results:
-        x = (np.arange(topk_precision.shape[0])+1)*step_interval
+    for name, (topk, topk_SE, mse, mse_SE, percentage, percentage_SE) in results:
+        x = (np.arange(topk.shape[0])+1)*step_interval
         if "topk" in types:
-            axes["topk"].plot(x, topk_precision, ".-", label=name, linewidth=2.0)
-            axes["topk"].fill_between(x, (topk_precision-topk_SE), (topk_precision+topk_SE), alpha=.3)
+            axes["topk"].plot(x, topk, ".-", label=name, linewidth=2.0)
+            axes["topk"].fill_between(x, (topk-topk_SE), (topk+topk_SE), alpha=.3)
+        if "percentage" in types:
+            axes["percentage"].plot(x, percentage, ".-", label=name, linewidth=2.0)
+            # axes["percentage"].fill_between(x, (percentage-percentage_SE), (percentage+percentage_SE), alpha=.3)
         if "mse" in types:
-            axes["mse"].plot(x, precision, ".-", label=name, linewidth=2.0)
-            axes["mse"].fill_between(x, (precision-SE), (precision+SE), alpha=.3)
+            axes["mse"].plot(x, mse, ".-", label=name, linewidth=2.0)
+            axes["mse"].fill_between(x, (mse-mse_SE), (mse+mse_SE), alpha=.3)
     
     handles, labels = axes[types[0]].get_legend_handles_labels()
     fig.legend(handles, labels, loc='lower center', ncols=4, bbox_to_anchor=(0.5, -0.15))

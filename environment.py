@@ -12,22 +12,33 @@ class Environment:
     def evaluate(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
         steps = math.floor(self.T/step_interval)
         precisions = np.zeros((rounds, steps))
+        percentage = np.zeros((rounds, steps))
         mse = np.zeros((rounds, steps))
         for i in range(rounds):
             game.initialize(n = self.n)
             algorithm.initialize(game, self.T)
             algorithm.get_top_k(k, step_interval)
-            real = np.array([game.get_phi(i) for i in range(self.n)])
-            approximated = np.array(algorithm.values)
-            top_k_real = set(game.get_top_k(k))
-            top_k_approximated = np.argpartition(algorithm.values, -k)[:, -k:]
-            assert top_k_approximated.shape == (steps, k), (top_k_approximated.shape, (steps, k))
-            assert approximated.shape == (steps, self.n), (approximated.shape, (steps, self.n))
-            mse[i] = np.array([sum(self.get_MSE(step, real))/self.n for step in approximated])
+            
+            phi = np.array([game.get_phi(i) for i in range(self.n)])
+            phi_estimated = np.array(algorithm.values)
+            assert phi_estimated.shape == (steps, self.n), (phi_estimated.shape, (steps, self.n))
+            mse[i] = np.sum((phi_estimated - phi)**2, axis=1)/self.n
+            
+            relevant_players, candidates, sum_topk = game.get_top_k(k) 
+            top_k_estimated = np.argpartition(algorithm.values, -k)[:, -k:]
+            assert top_k_estimated.shape == (steps, k), (top_k_estimated.shape, (steps, k))
+            num_correct = np.isin(top_k_estimated, relevant_players).sum(axis=1)
+            num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(axis=1), a_min = 0, a_max = k-relevant_players.shape[0])
+            
+            # print(relevant_players, candidates, top_k_estimated[-1], num_correct[-1])
+            
             if self.metric == "ratio":
-                precisions[i] = [self.get_ratio_scale(set(step), top_k_real) for step in top_k_approximated]
+                precisions[i] = num_correct/k
             else:
-                precisions[i] = [self.get_numeric_scale(set(step), top_k_real) for step in top_k_approximated]
+                precisions[i] = num_correct == k
+            
+            percentage[i] = np.sum(phi[top_k_estimated], axis=1) / sum_topk
+                
 
         
         avg_prec = np.average(precisions, axis=0)
@@ -36,8 +47,10 @@ class Environment:
         variance_mse = np.sum((mse-avg_mse)**2, axis=0)/(rounds-1)
         SE_prec = np.sqrt(variance_prec/rounds)
         SE_mse = np.sqrt(variance_mse/rounds)
+        avg_percentage = np.average(precisions, axis=0)
+        SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
 
-        return avg_prec, SE_prec, avg_mse, SE_mse
+        return avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage
 
     def get_numeric_scale(self, approximated: set, real: set):
         return approximated.issubset(real)

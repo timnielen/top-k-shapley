@@ -54,7 +54,7 @@ class SVARM(Algorithm):
             self.phi = np.array(phi_plus) - np.array(phi_minus)
             self.save_steps(step_interval)
 
-class StratSVARM(Algorithm):
+class oldStratSVARM(Algorithm):
     def __init__(self, start_exact=True):
         self.start_exact = start_exact
     def update(self, A: list, A_p: list, A_m: list):
@@ -152,6 +152,86 @@ class StratSVARM(Algorithm):
             self.update(A_t1, A_t1, [i for i in range(n) if not i in A_t1])
             
         self.func_calls += 1
+        self.save_steps(step_interval)
+
+
+class StratSVARM(Algorithm):
+    def __init__(self, start_exact=True, theoretical_distribution=True):
+        self.start_exact = start_exact
+        self.theoretical_distribution = theoretical_distribution
+    def exact_calculation(self):
+        n = self.game.n
+        A = [[i] for i in range(n)]
+        B = [[i for i in range(n) if i != j] for j in range(n)]
+        C = [[i for i in range(n)]]
+        for a in A + B + C:
+            if(self.func_calls+1 > self.T):
+                break
+            self.update(a,a,[i for i in range(n) if not i in a])
+
+    def p_size(self, s) -> int:
+        n = self.game.n
+        if n%2 == 0:
+            H = sum([1/k for k in range(1,math.floor(n/2))])
+            if s in [i for i in range(2,math.floor((n-2)/2+1))]:
+                return (n*math.log(n)-1)/(2*s*n*math.log(n)*(H-1))
+            if s == n/2:
+                return 1/(n*math.log(n))
+            else:
+                return (n*math.log(n)-1)/(2*(n-s)*n*math.log(n)*(H-1))
+        else:
+            H = sum([1/k for k in range(1,math.floor((n-1)/2+1))])
+            if s in [i for i in range(2,math.floor((n-1)/2+1))]:
+                return 1/(2*s*(H-1))
+            else: 
+                return 1/(2*(n-s)*(H-1))
+
+    def update(self, S, notS):
+        l = len(S)
+        v = self.value(S)
+        for player in S:
+            self.phi_p[player, l-1] = (self.count_p[player, l-1] * self.phi_p[player, l-1] + v) / (self.count_p[player, l-1] + 1)
+            self.count_p[player, l-1] += 1
+        for player in notS:
+            self.phi_m[player, l] = (self.count_m[player, l] * self.phi_m[player, l] + v) / (self.count_m[player, l] + 1)
+            self.count_m[player, l] += 1
+            
+        self.phi = 1/self.game.n * np.sum(self.phi_p-self.phi_m,axis=1)
+        self.save_steps(self.step_interval)
+    def sample(self):
+        n = self.game.n
+        if not self.start_exact:
+            length = np.random.randint(1, n)
+        elif self.theoretical_distribution:
+            length = np.random.choice(np.arange(2,n-1), p=self.distribution)
+        else: 
+            length = np.random.randint(2, n-1)
+        S = np.arange(n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        self.phi_p = np.zeros((n,n))
+        self.phi_m = np.zeros((n,n))
+        self.count_p = np.zeros((n,n))
+        self.count_m = np.zeros((n,n))
+        self.update(np.arange(n), np.array([]))
+        self.update(np.array([]), np.arange(n))
+        self.distribution = np.array([self.p_size(s) for s in range(2,n-1)])
+        if self.start_exact:
+            for player in range(n):
+                not_player = np.concatenate((np.arange(player), np.arange(player+1, n)))
+                self.update(not_player, np.array([player]))
+                self.update(np.array([player]), not_player)
+                
+        while self.func_calls + 2 <= self.T:
+            S, notS = self.sample()
+            self.update(S, notS)
+            self.update(notS, S)
+            
+        self.func_calls = self.T
         self.save_steps(step_interval)
 
 class TruncStratSvarm(Algorithm):
