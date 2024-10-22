@@ -43,6 +43,58 @@ class CMCS(Algorithm):
         self.func_calls = self.T
         self.save_steps(step_interval)
         
+class CMCS2(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self, length=None):
+        if length is None:
+            length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        t = 0
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        phi_middle = np.zeros(n)
+        phi_0 = np.zeros(n)
+        phi_n = np.zeros(n)
+        players = np.arange(n)
+        for player in range(n):
+            phi_0[player] = self.value(np.array([player])) - self.v_0
+            phi_n[player] = self.v_n - self.value(players[players != player])
+            self.phi[player] = phi_0[player] + phi_n[player]
+        while self.func_calls+n+1 <= self.T:
+            length = np.random.randint(1,n)
+            S, notS = self.sample(length)
+            v_S = self.value(S)
+            for player in S:
+                marginal = v_S - self.value(S[S != player])
+                phi_middle[player] = (t*phi_middle[player]+marginal)/(t+1)
+                self.phi[player] = 1/n * (phi_0[player] + phi_n[player]) + (n-1)/(n+1) * phi_middle[player]
+                self.save_steps(step_interval)
+            for player in notS:
+                marginal = self.value(np.concatenate((S, [player]))) - v_S
+                phi_middle[player] = (t*phi_middle[player]+marginal)/(t+1)
+                self.phi[player] = 1/n * (phi_0[player] + phi_n[player]) + (n-1)/(n+1) * phi_middle[player]
+                self.save_steps(step_interval)
+            t += 1
+        self.func_calls = self.T
+        self.save_steps(step_interval)
+        
 def binom(n, k):
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 class SIR_CMCS(Algorithm):
@@ -234,6 +286,100 @@ class Adaptive_CMCS(Algorithm):
                 self.save_steps(step_interval)
             t += 1
             # print("B", self.func_calls)
+            
+        
+        self.func_calls = self.T
+        self.save_steps(step_interval)
+        
+class Adaptive_CMCS2(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self, length=None):
+        if length is None:
+            length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        t = 0
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        weights_include = np.zeros(n, dtype=np.float32)
+        weights_exclude = np.zeros(n, dtype=np.float32)
+        counts_include = np.zeros(n, dtype=np.int32)
+        counts_exclude = np.zeros(n, dtype=np.int32)
+        weights = np.ones(n)/2
+        coalition_weights = np.array([1/((n+1)*binom(n, l)) for l in range(n+1)])
+        pre_samples = 100
+        # prev_t = 0
+        # phi = np.zeros(n)
+        uncertain_players = np.arange(n)
+        while self.func_calls+n+1 <= self.T:
+            total_weights = 0
+            for _ in range(pre_samples):
+                S_new, notS_new = self.sample()
+                weight = np.prod(weights[S_new]) * np.prod(1-weights[notS_new])
+                total_weights += weight
+                if np.random.rand() < weight / total_weights:
+                    S, notS = S_new, notS_new
+            density = np.prod(weights[S]) * np.prod(1-weights[notS]) / total_weights
+            length = S.shape[0]
+            
+            v_S = self.value(S)
+            absolute_marginals = 0
+            for player in S:
+                marginal = v_S - self.value(S[S != player])
+                marginal *= coalition_weights[length] / density
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                # self.phi[player] = (self.phi[player] * prev_t + phi[player] * (t+1)) / (prev_t + t + 1)
+                if player in uncertain_players:
+                    absolute_marginals += abs(marginal) / coalition_weights[length]
+                self.save_steps(step_interval)
+            for player in notS:
+                marginal = self.value(np.concatenate((S, [player]))) - v_S
+                marginal *= coalition_weights[length] / density
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                # self.phi[player] = (self.phi[player] * prev_t + phi[player] * (t+1)) / (prev_t + t + 1)
+                if player in uncertain_players:
+                    absolute_marginals += abs(marginal) / coalition_weights[length]
+                self.save_steps(step_interval)
+            weights_include[S] += absolute_marginals
+            counts_include[S] += 1
+            weights_exclude[notS] += absolute_marginals
+            counts_exclude[notS] += 1
+            t += 1
+            
+            if t % 100 == 0:
+                self.phi = np.zeros(n)
+                # prev_t += t
+                t = 0
+                weights_include /= counts_include
+                weights_exclude /= counts_exclude
+                weights_include[counts_include == 0] = 0
+                weights_exclude[counts_exclude == 0] = 0
+                weights = weights_include / (weights_include + weights_exclude)
+                weights_include = np.zeros(n, dtype=np.float32)
+                weights_exclude = np.zeros(n, dtype=np.float32)
+                counts_include = np.zeros(n, dtype=np.int32)
+                counts_exclude = np.zeros(n, dtype=np.int32)
+                sorted = np.argsort(-self.phi)
+                border = (self.phi[sorted[k-1]] - self.phi[sorted[k]])/2
+                distances = (self.phi - border)**2
+                num_uncertain_players = 4
+                uncertain_players = np.argsort(distances)[:num_uncertain_players]
             
         
         self.func_calls = self.T
