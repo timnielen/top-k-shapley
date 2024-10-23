@@ -11,8 +11,9 @@ class ApproShapley(Algorithm):
     def optimized(self, k: int, step_interval: int = 100):
         n = self.game.n
         self.phi = np.zeros(n)
-        t=np.zeros(n)
+        t=0
         v_n = self.value(np.arange(n))
+        v_0 = self.value(np.array([]))
         while(True):
             O = np.arange(n)
             np.random.shuffle(O)
@@ -20,15 +21,15 @@ class ApproShapley(Algorithm):
             for i in range(n):
                 player = O[i]
                 if i == n-1:
-                    value = 0
+                    value = v_0
                 else:
                     if(self.func_calls == self.T):
                         return
                     value = self.value(O[i+1:])
-                self.phi[player] = ((t[player])*self.phi[player] + pre - value)/(t[player]+1)
-                t[player] += 1
+                self.phi[player] = (t*self.phi[player] + pre - value)/(t+1)
                 pre = value
                 self.save_steps(step_interval)
+            t += 1
             
     
     def not_optimized(self, k: int, step_interval: int = 100):

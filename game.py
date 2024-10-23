@@ -84,6 +84,7 @@ class AirportGame(Game):
                  + [0.289369662 for i in range(10)]):
         self.c = c
         self.s = s
+        self.name = ""
 
     def get_phi(self, i: int) -> float:
         assert self.n == len(self.c)
@@ -116,6 +117,7 @@ class SumUnanimityGames(Game):
     def __init__(self, min_games=5, max_games=50):
         self.min_games = min_games
         self.max_games = max_games
+        self.name = ""
 
     def initialize(self, n: int):
         num_games = random.randint(self.min_games, self.max_games)
@@ -152,7 +154,7 @@ def coalition_to_index(coalition):
 class GlobalFeatureImportance(Game):
     def __init__(self, filepath, num_players, use_cached=True):
         self.n = num_players
-        
+        self.name = filepath.split('/')[-1]
         values_path = f"{filepath.split('.')[0]}_values.npy"
         shapley_values_path = f"{filepath.split('.')[0]}_shapley_values_phi.npy"
         if use_cached:
@@ -176,7 +178,7 @@ class GlobalFeatureImportance(Game):
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
-            
+        assert num_players == np.log2(self.values.shape[0])
         print(self.values)
         print(self.phi, np.sum(self.phi))
         
@@ -243,13 +245,15 @@ class LocalFeatureImportance(Game):
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
-            
+        
+        assert n == np.log2(self.values.shape[0])
         # print(self.values)
         # print(self.phi, np.sum(self.phi))
     def __init__(self, directory, num_players, use_cached=True):
         self.directory = directory
         self.n = num_players
         self.use_cached = use_cached
+        self.name = directory.split('/')[-1]
         
     def reindex(self):
         values = np.zeros((2**self.n))
@@ -289,3 +293,37 @@ class LocalFeatureImportance(Game):
         return phi
     def get_phi(self, i: int) -> float:
         return self.phi[i]
+
+class UnsupervisedFeatureImportance(GlobalFeatureImportance):
+    def reindex(self):
+        values = np.zeros((2**self.n))
+        num_sets_per_length = np.array([binom(self.n, l) for l in range(self.n+1)])
+        min_index_per_length = [np.sum(num_sets_per_length[:l]) for l in range(self.n+1)]
+        min_index_per_length
+        for i in range(2**self.n):
+            coalition = index_to_coalition(i)
+            name = f"s{''.join(coalition.astype('str'))}"
+            rows = self.df[self.df["set"] == name]
+            if rows.shape[0] > 1:
+                rows = rows[rows.index >= min_index_per_length[coalition.shape[0]]]
+                rows = rows[rows.index < min_index_per_length[coalition.shape[0]+1]]
+            val = rows["value"]
+            values[i] = val.to_numpy()[0]
+            if i%1000 == 0:
+                print(i)
+        return values
+    def exact_calculation(self):
+        weights = np.zeros(self.n)
+        for length in range(self.n):
+            weights[length] = 1/(self.n*binom(self.n-1, length))
+        
+        phi = np.zeros(self.n)
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            for player in range(self.n):
+                if player in coalition:
+                    phi[player] += weights[length-1] * self.values[index]
+                else:
+                    phi[player] -= weights[length] * self.values[index]
+        return phi

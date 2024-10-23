@@ -159,15 +159,6 @@ class StratSVARM(Algorithm):
     def __init__(self, start_exact=True, theoretical_distribution=True):
         self.start_exact = start_exact
         self.theoretical_distribution = theoretical_distribution
-    def exact_calculation(self):
-        n = self.game.n
-        A = [[i] for i in range(n)]
-        B = [[i for i in range(n) if i != j] for j in range(n)]
-        C = [[i for i in range(n)]]
-        for a in A + B + C:
-            if(self.func_calls+1 > self.T):
-                break
-            self.update(a,a,[i for i in range(n) if not i in a])
 
     def p_size(self, s) -> int:
         n = self.game.n
