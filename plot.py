@@ -43,3 +43,24 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
     if save:
         plt.savefig(filepath, bbox_inches='tight')
     plt.show()
+    
+def plot_fixedBudget(results, K, save=False, filepath="fixedK.pdf"):
+    plt.style.use(plt.style.library['ggplot'])
+    plt.rcParams.update({'font.size': 12})
+    plt.rcParams['legend.frameon'] = False
+    plt.rcParams['lines.markersize'] = 10
+    fig, axis = plt.subplots(1, 1, figsize=(8,5), dpi=1000)
+    
+    for name, (precision, precision_SE) in results:
+        axis.plot(K, precision, ".-", label=name, linewidth=2.0)
+        axis.fill_between(K, (precision-precision_SE), (precision+precision_SE), alpha=.3)
+        
+    handles, labels = axis.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', ncols=4, bbox_to_anchor=(0.5, -0.15))
+    
+    axis.set_xlabel("k")
+    axis.set_ylabel("φ")
+    
+    if save:
+        plt.savefig(filepath, bbox_inches='tight')
+    plt.show()

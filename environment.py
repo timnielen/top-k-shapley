@@ -60,3 +60,29 @@ class Environment:
     
     def get_MSE(self, approximated, real):
         return (real-approximated)**2
+    
+
+class FixedBudgetEnvironment:
+    def __init__(self, n: int, budget: int):
+        self.budget = budget
+        self.n = n
+        
+    def evaluate(self, game: Game, algorithm: Algorithm, K: np.ndarray, rounds:int=100):
+        precisions = np.zeros((rounds, K.shape[0]))
+        for i in range(rounds):
+            game.initialize(n = self.n)
+            for index_k, k in enumerate(K):
+                algorithm.initialize(game, self.budget)
+                algorithm.get_top_k(k, step_interval=self.budget)
+                
+                relevant_players, candidates, sum_topk = game.get_top_k(k) 
+                top_k_estimated = np.argpartition(algorithm.values, -k)[0, -k:]
+                num_correct = np.isin(top_k_estimated, relevant_players).sum()
+                num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(), a_min = 0, a_max = k-relevant_players.shape[0])
+                precisions[i, index_k] = num_correct/k
+                
+        avg_prec = np.average(precisions, axis=0)
+        variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
+        SE_prec = np.sqrt(variance_prec/rounds)
+        
+        return avg_prec, SE_prec
