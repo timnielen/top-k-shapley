@@ -128,23 +128,19 @@ class Selective_CMCS(Algorithm):
         while self.func_calls+2 <= self.T:
             sorted_players = np.argsort(-self.phi)
             border = (self.phi[sorted_players[k-1]] + self.phi[sorted_players[k]])/2
-            # if (sample_variance < 0).sum() > 0:
-            #     print(self.func_calls, sample_variance)
-            allowed = sample_variance > 0
-            certainty = np.abs(self.phi - border)[allowed] * t[allowed]
+            
+            certainty = np.abs(self.phi - border) * t
             min_certainty, max_certainty = np.min(certainty), np.max(certainty)
-            if np.any(t < 2):
+            weights = (max_certainty - certainty) / (max_certainty - min_certainty)
+            selected_players = np.array((np.random.rand(n) < weights).nonzero())[0]
+            # if selected_players.shape[0] == 0:
+            #     print("selected_players", selected_players)
+            #     print("phi", self.phi)
+            #     print("certainty", certainty)
+            #     print("weights", weights)
+            if np.any(t<1) or selected_players.shape[0] == 0:
                 selected_players = np.arange(n)
-            else: 
-                weights = np.zeros(n, dtype=np.float32)
-                weights[allowed] = (max_certainty - certainty) / (max_certainty - min_certainty)
-                selected_players = np.array((np.random.rand(n) < weights).nonzero())[0]
-            # print("phi", self.phi[sorted_players])
-            # print("players", sorted_players)
-            # print("border", border)
-            # print("certainty", certainty[sorted_players])
-            # print("selected", selected_players)
-            # print(self.func_calls, selected_players.shape[0])
+            
             S, notS = self.sample()
             v_S = self.value(S)
             for player in selected_players:
@@ -161,8 +157,8 @@ class Selective_CMCS(Algorithm):
                 t[player] += 1
             self.phi = marginals / t
             self.save_steps(step_interval)
-            if not np.any(t < 2):
-                sample_variance = squared_marginals/(t-1) - t*(self.phi**2)/(t-1)
+            # if not np.any(t < 2):
+            #     sample_variance = squared_marginals/(t-1) - t*(self.phi**2)/(t-1)
         self.func_calls = self.T
         self.save_steps(step_interval)
 
