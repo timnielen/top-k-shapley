@@ -150,6 +150,14 @@ def coalition_to_index(coalition):
         return 0
     return np.sum(1 << coalition)
 
+def clear_ith_bit(number, i):
+    # Use bitwise AND with a mask where the ith bit is 0, and all others are 1
+    return number & ~(1 << i)
+
+def set_ith_bit(number, i):
+    # Use bitwise OR with a mask where only the ith bit is set to 1
+    return number | (1 << i)
+
 
 class GlobalFeatureImportance(Game):
     def __init__(self, filepath, num_players, use_cached=True):
@@ -157,6 +165,7 @@ class GlobalFeatureImportance(Game):
         self.name = filepath.split('/')[-1]
         values_path = f"{filepath.split('.')[0]}_values.npy"
         shapley_values_path = f"{filepath.split('.')[0]}_shapley_values_phi.npy"
+        covariance_path = f"{filepath.split('.')[0]}_covariance.npy"
         if use_cached:
             try:
                 self.values = np.load(values_path)
@@ -173,11 +182,20 @@ class GlobalFeatureImportance(Game):
                 self.phi = self.exact_calculation()
                 np.save(shapley_values_path, self.phi)
                 
+            try:
+                self.covariance = np.load(covariance_path)
+            except:
+                print(f"could not find cached covaraince. manual calculation...")
+                self.covariance = self.calc_covariance()
+                np.save(covariance_path, self.covariance)
+                
         else: 
             self.values = self.reindex()
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
+            self.covariance = self.calc_covariance()
+            np.save(covariance_path, self.covariance)
         assert num_players == np.log2(self.values.shape[0])
         print(self.values)
         print(self.phi, np.sum(self.phi))
@@ -210,6 +228,46 @@ class GlobalFeatureImportance(Game):
                 else:
                     phi[player] -= weights[length] * self.values[index]
         return phi
+    
+    def calc_covariance(self):
+        weights = np.zeros(self.n+1)
+        for length in range(self.n+1):
+            weights[length] = 1/((self.n+1)*binom(self.n, length))
+        n = self.n
+        covariances = np.zeros((n,n))
+        
+        ## calc E[XY]
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])
+            for player in range(n):
+                covariances[player] += weight * marginals[player] * marginals 
+        
+        ## calc E[X]E[Y]
+        for player in range(n):
+            covariances[player] -= self.phi[player] * self.phi
+            
+        return covariances
+    
+    def calc_variance(self):
+        weights = np.zeros(self.n+1)
+        for length in range(self.n+1):
+            weights[length] = 1/((self.n+1)*binom(self.n, length))
+        n = self.n
+        
+        variance = np.zeros(self.n)
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])**2
+            variance += weight * marginals
+            
+        
+        return variance - self.phi**2
+        
     def get_phi(self, i: int) -> float:
         return self.phi[i]
     
@@ -312,18 +370,3 @@ class UnsupervisedFeatureImportance(GlobalFeatureImportance):
             if i%1000 == 0:
                 print(i)
         return values
-    def exact_calculation(self):
-        weights = np.zeros(self.n)
-        for length in range(self.n):
-            weights[length] = 1/(self.n*binom(self.n-1, length))
-        
-        phi = np.zeros(self.n)
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            for player in range(self.n):
-                if player in coalition:
-                    phi[player] += weights[length-1] * self.values[index]
-                else:
-                    phi[player] -= weights[length] * self.values[index]
-        return phi
