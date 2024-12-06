@@ -15,7 +15,7 @@ class CMCS(Algorithm):
             v = self.game.value(S)
         return v
     def sample(self):
-        length = np.random.choice(np.arange(self.game.n+1))
+        length = np.random.randint(self.game.n+1)
         S = np.arange(self.game.n)
         np.random.shuffle(S)
         return S[:length], S[length:]
@@ -42,6 +42,131 @@ class CMCS(Algorithm):
             t += 1
         self.func_calls = self.T
         self.save_steps(step_interval)
+
+
+class CMCS_Independent(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self):
+        length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        t = 0
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        
+        while self.func_calls+2*n <= self.T:
+            for player in range(n):
+                S, notS = self.sample()
+                if player in S:
+                    marginal = self.value(S) - self.value(S[S != player])
+                else:
+                    marginal = self.value(np.concatenate((S, [player]))) - self.value(S)
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                self.save_steps(step_interval)
+            t += 1
+        while self.func_calls < self.T:
+            self.func_calls += 1
+            self.save_steps(step_interval)
+        
+class CMCS_Length(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self):
+        length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        t = 0
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        
+        while self.func_calls+2*n <= self.T:
+            length = np.random.randint(self.game.n+1)
+            for player in range(n):
+                S = np.arange(self.game.n)
+                np.random.shuffle(S)
+                S = S[:length]
+                if player in S:
+                    marginal = self.value(S) - self.value(S[S != player])
+                else:
+                    marginal = self.value(np.concatenate((S, [player]))) - self.value(S)
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                self.save_steps(step_interval)
+            t += 1
+        while self.func_calls < self.T:
+            self.func_calls += 1
+            self.save_steps(step_interval)
+        
+class CMCS_Dependent(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self):
+        length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n)
+        t = 0
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        
+        while self.func_calls+2*n <= self.T:
+            S, notS = self.sample()
+            for player in S:
+                marginal = self.value(S) - self.value(S[S != player])
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                self.save_steps(step_interval)
+            for player in notS:
+                marginal = self.value(np.concatenate((S, [player]))) - self.value(S)
+                self.phi[player] = (t*self.phi[player]+marginal)/(t+1)
+                self.save_steps(step_interval)
+            t += 1
+        while self.func_calls < self.T:
+            self.func_calls += 1
+            self.save_steps(step_interval)
 
 #precomputed values for l=0 and l=n
 class CMCS2(Algorithm):
@@ -110,7 +235,7 @@ class Selective_CMCS(Algorithm):
             v = self.game.value(S)
         return v
     def sample(self):
-        length = np.random.choice(np.arange(self.game.n+1))
+        length = np.random.randint(self.game.n+1)
         S = np.arange(self.game.n)
         np.random.shuffle(S)
         return S[:length], S[length:]
@@ -162,6 +287,155 @@ class Selective_CMCS(Algorithm):
         self.func_calls = self.T
         self.save_steps(step_interval)
 
+
+class Variance_CMCS(Algorithm):
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self):
+        length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n, dtype=np.float32)
+        t = np.zeros(n, dtype=np.int32)
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        
+        sum_marginal_prods = np.zeros((n,n), dtype=np.float32)
+        count_marginal_prods = np.zeros((n,n), dtype=np.float32)
+        diff_variance = np.zeros((n,n), dtype=np.float32)
+        
+        sum_marginal_squares = np.zeros(n, dtype=np.float32)
+        sum_marginals = np.zeros(n, dtype=np.float32)
+        sample_variance = np.zeros(n, dtype=np.float32)
+        
+        selected_players = np.array([])
+        while self.func_calls+2 <= self.T:
+            
+            if np.any(t<2) or selected_players.shape[0] == 0:
+                selected_players = np.arange(n)
+            else:
+                sorted_players = np.argsort(-self.phi)
+                # border = (self.phi[sorted_players[k-1]] + self.phi[sorted_players[k]])/2
+                partners = np.zeros(n, dtype=np.int32)
+                partners[sorted_players[:k]] = sorted_players[k]
+                partners[sorted_players[k:]] = sorted_players[k-1]
+                var = diff_variance[np.arange(n, dtype=np.int32), partners]
+                distance = np.abs(self.phi - self.phi[partners])
+                # print(var / distance)
+                # var[var == 0] = np.min(var[var != 0])
+                certainty = distance / np.sqrt(var) * t
+                min_certainty, max_certainty = np.min(certainty), np.max(certainty)
+                weights = (max_certainty - certainty) / (max_certainty - min_certainty)
+                selected_players = np.array((np.random.rand(n) < weights).nonzero())[0]
+            
+            S, notS = self.sample()
+            v_S = self.value(S)
+            marginals = np.zeros(n)
+            for player in selected_players:
+                if self.func_calls == self.T:
+                    self.phi = sum_marginals / t
+                    self.save_steps(step_interval)
+                    return
+                if player in S:
+                    marginal = v_S - self.value(S[S != player])
+                else:
+                    marginal = self.value(np.concatenate((S, [player]))) - v_S
+                marginals[player] = marginal
+                t[player] += 1
+                count_marginal_prods[player, selected_players] += 1
+                sum_marginal_squares[player] += marginal**2
+                sum_marginals[player] += marginal
+            sum_marginal_prods += marginals[np.arange(n, dtype=int), np.newaxis] * marginals
+            
+            self.phi = sum_marginals / t
+            self.save_steps(step_interval)
+            if np.all(t > 1):
+                sample_variance = (sum_marginal_squares - (sum_marginals**2)/t)/(t-1)
+                diff_variance = (sample_variance[np.arange(n, dtype=int), np.newaxis] + sample_variance) + 2 * (self.phi[np.arange(n, dtype=int), np.newaxis] * self.phi) - 2 * sum_marginal_prods / count_marginal_prods
+                diff_variance /= count_marginal_prods
+                # print(diff_variance[:5,:5])
+        self.func_calls = self.T
+        self.save_steps(step_interval)
+
+class Variance_CMCS_Cheat(Algorithm):
+    def __init__(self, diff_variance):
+        self.diff_variance = diff_variance
+    def value(self, S: list):
+        l = len(S)
+        if l == 0:
+            v = self.v_0
+        elif l == self.game.n:
+            v = self.v_n
+        else:
+            assert self.func_calls < self.T
+            self.func_calls += 1
+            v = self.game.value(S)
+        return v
+    def sample(self):
+        length = np.random.randint(self.game.n+1)
+        S = np.arange(self.game.n)
+        np.random.shuffle(S)
+        return S[:length], S[length:]
+    def get_top_k(self, k: int, step_interval: int = 100):
+        self.step_interval = step_interval
+        n = self.game.n
+        self.phi = np.zeros(n, dtype=np.float32)
+        t = np.zeros(n, dtype=np.int32)
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        sum_marginals = np.zeros(n, dtype=np.float32)
+        
+        selected_players = np.array([])
+        while self.func_calls+2 <= self.T:
+            
+            if np.any(t<1) or selected_players.shape[0] == 0:
+                selected_players = np.arange(n)
+            else:
+                sorted_players = np.argsort(-self.phi)
+                partners = np.zeros(n, dtype=np.int32)
+                partners[sorted_players[:k]] = sorted_players[k]
+                partners[sorted_players[k:]] = sorted_players[k-1]
+                # var = self.diff_variance[np.arange(n, dtype=np.int32), partners]
+                distance = np.abs(self.phi - self.phi[partners])
+                certainty = distance / np.sqrt(self.diff_variance) * t
+                min_certainty, max_certainty = np.min(certainty), np.max(certainty)
+                weights = (max_certainty - certainty) / (max_certainty - min_certainty)
+                selected_players = np.array((np.random.rand(n) < weights).nonzero())[0]
+            
+            S, notS = self.sample()
+            v_S = self.value(S)
+            for player in selected_players:
+                if self.func_calls == self.T:
+                    self.phi = sum_marginals / t
+                    self.save_steps(step_interval)
+                    return
+                if player in S:
+                    marginal = v_S - self.value(S[S != player])
+                else:
+                    marginal = self.value(np.concatenate((S, [player]))) - v_S
+                t[player] += 1
+                sum_marginals[player] += marginal
+            
+            self.phi = sum_marginals / t
+            self.save_steps(step_interval)
+        self.func_calls = self.T
+        self.save_steps(step_interval)
+
 def binom(n, k):
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 class SIR_CMCS(Algorithm):
@@ -177,7 +451,7 @@ class SIR_CMCS(Algorithm):
             v = self.game.value(S)
         return v
     def sample(self):
-        length = np.random.choice(np.arange(self.game.n+1))
+        length = np.random.randint(self.game.n+1)
         S = np.arange(self.game.n)
         np.random.shuffle(S)
         return S[:length], S[length:]

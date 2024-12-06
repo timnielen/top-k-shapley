@@ -3,6 +3,7 @@ import random
 import pandas as pd
 import math
 import os
+from util import *
 
 class Game:
     def initialize(self, n: int):
@@ -137,26 +138,7 @@ class SumUnanimityGames(Game):
         self.calls += 1
         return sum([self.c[index] * game.value(S) for index, game in enumerate(self.R)])
 
-def binom(n, k):
-    return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 
-
-def index_to_coalition(index):
-    view = np.array([index]).view(np.uint8)
-    return np.where(np.unpackbits(view, bitorder='little'))[0]
-
-def coalition_to_index(coalition):
-    if(coalition.shape[0] == 0):
-        return 0
-    return np.sum(1 << coalition)
-
-def clear_ith_bit(number, i):
-    # Use bitwise AND with a mask where the ith bit is 0, and all others are 1
-    return number & ~(1 << i)
-
-def set_ith_bit(number, i):
-    # Use bitwise OR with a mask where only the ith bit is set to 1
-    return number | (1 << i)
 
 
 class GlobalFeatureImportance(Game):
@@ -165,7 +147,6 @@ class GlobalFeatureImportance(Game):
         self.name = filepath.split('/')[-1]
         values_path = f"{filepath.split('.')[0]}_values.npy"
         shapley_values_path = f"{filepath.split('.')[0]}_shapley_values_phi.npy"
-        covariance_path = f"{filepath.split('.')[0]}_covariance.npy"
         if use_cached:
             try:
                 self.values = np.load(values_path)
@@ -182,20 +163,11 @@ class GlobalFeatureImportance(Game):
                 self.phi = self.exact_calculation()
                 np.save(shapley_values_path, self.phi)
                 
-            try:
-                self.covariance = np.load(covariance_path)
-            except:
-                print(f"could not find cached covaraince. manual calculation...")
-                self.covariance = self.calc_covariance()
-                np.save(covariance_path, self.covariance)
-                
         else: 
             self.values = self.reindex()
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
-            self.covariance = self.calc_covariance()
-            np.save(covariance_path, self.covariance)
         assert num_players == np.log2(self.values.shape[0])
         print(self.values)
         print(self.phi, np.sum(self.phi))
@@ -235,23 +207,36 @@ class GlobalFeatureImportance(Game):
             weights[length] = 1/((self.n+1)*binom(self.n, length))
         n = self.n
         covariances = np.zeros((n,n))
-        
         ## calc E[XY]
         for index in range(2**self.n):
             coalition = index_to_coalition(index)
             length = coalition.shape[0]
             weight = weights[length]
             marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])
-            for player in range(n):
-                covariances[player] += weight * marginals[player] * marginals 
+            covariances += weight * np.expand_dims(marginals, 1) @ np.expand_dims(marginals, 0)
         
         ## calc E[X]E[Y]
-        for player in range(n):
-            covariances[player] -= self.phi[player] * self.phi
+        covariances -= np.expand_dims(self.phi, 1) @ np.expand_dims(self.phi, 0)
             
         return covariances
     
-    def calc_variance(self):
+    def calc_variance_normal(self):
+        weights = np.zeros(self.n+1)
+        for length in range(self.n):
+            weights[length] = 1/((self.n)*binom(self.n-1, length))
+        n = self.n
+        
+        variance = np.zeros(self.n)
+        for index in range(2**self.n-1):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[index] if not player in coalition else 0 for player in range(n) ])**2
+            variance += weight * marginals
+        
+        return variance - self.phi**2
+    
+    def calc_variance_cmcs(self):
         weights = np.zeros(self.n+1)
         for length in range(self.n+1):
             weights[length] = 1/((self.n+1)*binom(self.n, length))
@@ -264,9 +249,26 @@ class GlobalFeatureImportance(Game):
             weight = weights[length]
             marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])**2
             variance += weight * marginals
-            
         
         return variance - self.phi**2
+            
+    def calc_variance_strat_svarm(self):
+        n = self.n
+        weights = np.zeros(n+1)
+        for length in range(n+1):
+            weights[length] = 1/((n)*binom(n-1, length))
+        
+        variance_plus = np.zeros(n)
+        variance_minus = np.zeros(n)
+        for index in range(2**n-1):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            variance_plus += weight * np.array([self.values[set_ith_bit(index, player)] if player in coalition else 0 for player in range(n)])
+            variance_minus += weight * np.array([self.values[index] if not player in coalition else 0 for player in range(n)])
+            
+        
+        return variance_plus, variance_minus
         
     def get_phi(self, i: int) -> float:
         return self.phi[i]

@@ -51,7 +51,40 @@ class Environment:
         SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
 
         return avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage
+    
+    def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
+        steps = math.floor(self.T/step_interval)
+        binary = np.zeros((rounds, steps))
+        kendall = np.zeros((rounds, steps))
+        spearman = np.zeros((rounds, steps))
+        for i in range(rounds):
+            game.initialize(n = self.n)
+            algorithm.initialize(game, self.T)
+            algorithm.get_top_k(k, step_interval)
+            
+            phi = np.array([game.get_phi(i) for i in range(self.n)])
+            phi_estimated = np.array(algorithm.values)
+            assert phi_estimated.shape == (steps, self.n), (phi_estimated.shape, (steps, self.n))
+            
+            correct_sorted = np.argsort(phi)
+            estimated_sorted = np.argsort(phi_estimated)
+            
+            spearman[i] = 1 - 6*np.sum((correct_sorted-estimated_sorted)**2, axis=-1)/(self.n*(self.n**2 - 1))
+            
+            binary[i] = np.sum(correct_sorted == estimated_sorted, axis=-1)/self.n
+            orders_real = np.tile(phi.reshape(-1, self.n, 1), (1,1,self.n)) > np.tile(phi, (1, self.n)).reshape(-1,self.n,self.n)
+            orders_pred = np.tile(phi_estimated.reshape(-1, self.n, 1), (1,1,self.n)) > np.tile(phi_estimated, (1, self.n)).reshape(-1,self.n,self.n)
+            num_discordant = np.sum(orders_real != orders_pred, axis=(-1,-2)) / 2
+            kendall[i] = 1 - (4*num_discordant)/(self.n*(self.n-1))
+                
 
+        
+        avg_binary = np.average(binary, axis=0)
+        avg_kendall = np.average(kendall, axis=0)
+        avg_spearman = np.average(spearman, axis=0)
+
+        return avg_binary, avg_kendall, avg_spearman
+    
     def get_numeric_scale(self, approximated: set, real: set):
         return approximated.issubset(real)
     

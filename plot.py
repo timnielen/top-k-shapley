@@ -44,6 +44,37 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
         plt.savefig(filepath, bbox_inches='tight')
     plt.show()
     
+def plot_order(results, step_interval, types = ["binary", "kendall", "spearman"], save=False, filepath=f"results/order_{time.time()}.pdf", start_at_x=0):
+    plt.style.use(plt.style.library['ggplot'])
+    plt.rcParams.update({'font.size': 12})
+    plt.rcParams['legend.frameon'] = False
+    plt.rcParams['lines.markersize'] = 10
+    fig, axes = plt.subplots(1, len(types), figsize=(len(types)*8,5), dpi=1000)
+    if type(axes) != np.ndarray:
+        axes = [axes]
+    axes = {types[i]: axes[i] for i in range(len(types))}   
+
+    for name, (avg_binary, avg_kendall, avg_spearman) in results:
+        start_index = max(math.floor(start_at_x / step_interval)-1, 0)
+        avg_binary, avg_kendall, avg_spearman = avg_binary[start_index:], avg_kendall[start_index:], avg_spearman[start_index:]
+        x = (np.arange(avg_binary.shape[0])+1+start_index)*step_interval
+        if "binary" in types:
+            axes["binary"].plot(x, avg_binary, ".-", label=name, linewidth=2.0)
+        if "kendall" in types:
+            axes["kendall"].plot(x, avg_kendall, ".-", label=name, linewidth=2.0)
+        if "spearman" in types:
+            axes["spearman"].plot(x, avg_spearman, ".-", label=name, linewidth=2.0)
+    
+    handles, labels = axes[types[0]].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', ncols=4, bbox_to_anchor=(0.5, -0.15))
+    
+    for ax in axes:
+        axes[ax].set_xlabel("T")
+
+    if save:
+        plt.savefig(filepath, bbox_inches='tight')
+    plt.show()
+    
 def plot_fixedBudget(results, K, save=False, filepath="fixedK.pdf"):
     plt.style.use(plt.style.library['ggplot'])
     plt.rcParams.update({'font.size': 12})
