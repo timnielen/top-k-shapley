@@ -220,23 +220,8 @@ class GlobalFeatureImportance(Game):
             
         return covariances
     
-    def calc_variance_normal(self):
-        weights = np.zeros(self.n+1)
-        for length in range(self.n):
-            weights[length] = 1/((self.n)*binom(self.n-1, length))
-        n = self.n
-        
-        variance = np.zeros(self.n)
-        for index in range(2**self.n-1):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[index] if not player in coalition else 0 for player in range(n) ])**2
-            variance += weight * marginals
-        
-        return variance - self.phi**2
     
-    def calc_variance_cmcs(self):
+    def calc_variance(self):
         weights = np.zeros(self.n+1)
         for length in range(self.n+1):
             weights[length] = 1/((self.n+1)*binom(self.n, length))
@@ -251,24 +236,6 @@ class GlobalFeatureImportance(Game):
             variance += weight * marginals
         
         return variance - self.phi**2
-            
-    def calc_variance_strat_svarm(self):
-        n = self.n
-        weights = np.zeros(n+1)
-        for length in range(n+1):
-            weights[length] = 1/((n)*binom(n-1, length))
-        
-        variance_plus = np.zeros(n)
-        variance_minus = np.zeros(n)
-        for index in range(2**n-1):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            variance_plus += weight * np.array([self.values[set_ith_bit(index, player)] if player in coalition else 0 for player in range(n)])
-            variance_minus += weight * np.array([self.values[index] if not player in coalition else 0 for player in range(n)])
-            
-        
-        return variance_plus, variance_minus
         
     def get_phi(self, i: int) -> float:
         return self.phi[i]
@@ -290,32 +257,31 @@ class LocalFeatureImportance(Game):
             except:
                 print(f"could not find cached values. manual reindexing...")
                 self.df = pd.read_csv(filepath)
-                self.values = self.reindex()
+                self.values = self.reindex(self.df)
                 np.save(values_path, self.values)
             
             try:
                 self.phi = np.load(shapley_values_path)
             except:
                 print(f"could not find cached shapley values. manual calculation...")
-                self.phi = self.exact_calculation()
+                self.phi = self.exact_calculation(self.values)
                 np.save(shapley_values_path, self.phi)
                 
         else: 
-            self.values = self.reindex()
+            self.values = self.reindex(self.df)
             np.save(values_path, self.values)
-            self.phi = self.exact_calculation()
+            self.phi = self.exact_calculation(self.values)
             np.save(shapley_values_path, self.phi)
         
         assert n == np.log2(self.values.shape[0])
-        # print(self.values)
-        # print(self.phi, np.sum(self.phi))
+        
     def __init__(self, directory, num_players, use_cached=True):
         self.directory = directory
         self.n = num_players
         self.use_cached = use_cached
         self.name = directory.split('/')[-1]
         
-    def reindex(self):
+    def reindex(self, df):
         values = np.zeros((2**self.n))
         num_sets_per_length = np.array([binom(self.n, l) for l in range(self.n+1)])
         min_index_per_length = [np.sum(num_sets_per_length[:l]) for l in range(self.n+1)]
@@ -323,7 +289,7 @@ class LocalFeatureImportance(Game):
         for i in range(2**self.n):
             coalition = index_to_coalition(i)
             name = f"s{''.join(coalition.astype('str'))}"
-            rows = self.df[self.df["set"] == name]
+            rows = df[df["set"] == name]
             if rows.shape[0] > 1:
                 rows = rows[rows.index >= min_index_per_length[coalition.shape[0]]]
                 rows = rows[rows.index < min_index_per_length[coalition.shape[0]+1]]
@@ -333,10 +299,50 @@ class LocalFeatureImportance(Game):
                 print(i)
         return values
     
+    def reindex_all(self):
+        games = [filename for filename in os.listdir(self.directory) if filename.split(".")[-1] == "csv"]
+        game_paths = [f"{self.directory}/{filename}" for filename in games]
+        value_paths = [f"{filepath.split('.')[0]}_values.npy" for filepath in game_paths]
+        values = np.zeros((len(game_paths), 2**self.n))
+        for index, path in enumerate(value_paths):
+            if self.use_cached:
+                try:
+                    values[index] = np.load(path)
+                except:
+                    print(f"could not find cached values. manual reindexing...")
+                    df = pd.read_csv(game_paths[index])
+                    values[index] = self.reindex(df)
+                    np.save(path, values[index])
+            else:
+                df = pd.read_csv(game_paths[index])
+                values[index] = self.reindex(df)
+                np.save(path, values[index])
+        return values, games
+    
+    def get_all_phi(self, all_values):
+        games = [filename for filename in os.listdir(self.directory) if filename.split(".")[-1] == "csv"]
+        game_paths = [f"{self.directory}/{filename}" for filename in games]
+        shapley_values_paths = [f"{filepath.split('.')[0]}_shapley_values_phi.npy" for filepath in game_paths]
+        shapley_values = np.zeros((len(game_paths), self.n))
+        for index, path in enumerate(shapley_values_paths):
+            if self.use_cached:
+                try:
+                    shapley_values[index] = np.load(path)
+                except:
+                    print(f"could not find cached shapley values. manual reindexing...")
+                    df = pd.read_csv(game_paths[index])
+                    shapley_values[index] = self.exact_calculation(df, all_values[index])
+                    np.save(path, shapley_values[index])
+            else:
+                df = pd.read_csv(game_paths[index])
+                shapley_values[index] = self.exact_calculation(df, all_values[index])
+                np.save(path, shapley_values[index])
+        return shapley_values, games
     
     def value(self, S):
         return self.values[coalition_to_index(np.array(S))]
-    def exact_calculation(self):
+    
+    def exact_calculation(self, values):
         weights = np.zeros(self.n)
         for length in range(self.n):
             weights[length] = 1/(self.n*binom(self.n-1, length))
@@ -347,12 +353,56 @@ class LocalFeatureImportance(Game):
             length = coalition.shape[0]
             for player in range(self.n):
                 if player in coalition:
-                    phi[player] += weights[length-1] * self.values[index]
+                    phi[player] += weights[length-1] * values[index]
                 else:
-                    phi[player] -= weights[length] * self.values[index]
+                    phi[player] -= weights[length] * values[index]
         return phi
+    
     def get_phi(self, i: int) -> float:
         return self.phi[i]
+    
+    def calc_covariance(self, values, phi):
+        num_games, num_coalitions = values.shape
+        weights = np.zeros(self.n+1)
+        for length in range(self.n+1):
+            weights[length] = 1/((self.n+1)*binom(self.n, length))
+            
+        n = self.n
+        covariances = np.zeros((num_games, n,n))
+        ## calc E[XY]
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            player_coalitions = np.array([[set_ith_bit(index, player), clear_ith_bit(index, player)] for player in range(n)]).transpose()
+            marginals = values[:, player_coalitions[0]] - values[:, player_coalitions[1]]
+            covariances += weight * (marginals[:, :, np.newaxis] * marginals[:, np.newaxis, :])
+        
+        ## calc E[X]E[Y]
+        covariances -= phi[:, :, np.newaxis] * phi[:, np.newaxis, :]
+            
+        return covariances
+    
+    def calc_variance(self, values, phi):
+        num_games, num_coalitions = values.shape
+        weights = np.zeros(self.n+1)
+        for length in range(self.n+1):
+            weights[length] = 1/((self.n+1)*binom(self.n, length))
+        n = self.n
+        
+        # calc E[X^2]
+        variance = np.zeros((num_games, self.n))
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            weight = weights[length]
+            player_coalitions = np.array([[set_ith_bit(index, player), clear_ith_bit(index, player)] for player in range(n)]).transpose()
+            marginals = values[:, player_coalitions[0]] - values[:, player_coalitions[1]]
+            variance += weight * (marginals**2)
+        
+        # calc E[X^2] - E[X]^2
+        variance -= phi**2
+        return variance
 
 class UnsupervisedFeatureImportance(GlobalFeatureImportance):
     def reindex(self):
