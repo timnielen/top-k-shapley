@@ -1,6 +1,7 @@
 from .algorithm import Algorithm
 import math
 import numpy as np
+import util
 
 class CMCS(Algorithm):
     def value(self, S: list):
@@ -372,7 +373,7 @@ class Variance_CMCS(Algorithm):
         self.save_steps(step_interval)
 
 class Variance_CMCS_Cheat(Algorithm):
-    def __init__(self, diff_variance):
+    def __init__(self, diff_variance=None):
         self.diff_variance = diff_variance
     def value(self, S: list):
         l = len(S)
@@ -391,6 +392,11 @@ class Variance_CMCS_Cheat(Algorithm):
         np.random.shuffle(S)
         return S[:length], S[length:]
     def get_top_k(self, k: int, step_interval: int = 100):
+        # print("test")
+        if self.diff_variance is None:
+            diff_variance = util.calc_variance(self.game.n, self.game.values[np.newaxis, :], self.game.phi[np.newaxis, :])[0]
+        else:
+            diff_variance = self.diff_variance
         self.step_interval = step_interval
         n = self.game.n
         self.phi = np.zeros(n, dtype=np.float32)
@@ -410,9 +416,9 @@ class Variance_CMCS_Cheat(Algorithm):
                 partners = np.zeros(n, dtype=np.int32)
                 partners[sorted_players[:k]] = sorted_players[k]
                 partners[sorted_players[k:]] = sorted_players[k-1]
-                # var = self.diff_variance[np.arange(n, dtype=np.int32), partners]
+                # var = diff_variance[np.arange(n, dtype=np.int32), partners]
                 distance = np.abs(self.phi - self.phi[partners])
-                certainty = distance / np.sqrt(self.diff_variance) * t
+                certainty = distance / np.sqrt(diff_variance) * t
                 min_certainty, max_certainty = np.min(certainty), np.max(certainty)
                 weights = (max_certainty - certainty) / (max_certainty - min_certainty)
                 selected_players = np.array((np.random.rand(n) < weights).nonzero())[0]
