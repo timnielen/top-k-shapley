@@ -144,7 +144,7 @@ class SumUnanimityGames(Game):
 class GlobalFeatureImportance(Game):
     def __init__(self, filepath, num_players, use_cached=True):
         self.n = num_players
-        self.name = filepath.split('/')[-1]
+        self.name = filepath.split('/')[-1].split('.')[0]
         values_path = f"{filepath.split('.')[0]}_values.npy"
         shapley_values_path = f"{filepath.split('.')[0]}_shapley_values_phi.npy"
         if use_cached:
@@ -200,42 +200,6 @@ class GlobalFeatureImportance(Game):
                 else:
                     phi[player] -= weights[length] * self.values[index]
         return phi
-    
-    def calc_covariance(self):
-        weights = np.zeros(self.n+1)
-        for length in range(self.n+1):
-            weights[length] = 1/((self.n+1)*binom(self.n, length))
-        n = self.n
-        covariances = np.zeros((n,n))
-        ## calc E[XY]
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])
-            covariances += weight * np.expand_dims(marginals, 1) @ np.expand_dims(marginals, 0)
-        
-        ## calc E[X]E[Y]
-        covariances -= np.expand_dims(self.phi, 1) @ np.expand_dims(self.phi, 0)
-            
-        return covariances
-    
-    
-    def calc_variance(self):
-        weights = np.zeros(self.n+1)
-        for length in range(self.n+1):
-            weights[length] = 1/((self.n+1)*binom(self.n, length))
-        n = self.n
-        
-        variance = np.zeros(self.n)
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            marginals = np.array([self.values[set_ith_bit(index, player)] - self.values[clear_ith_bit(index, player)] for player in range(n)])**2
-            variance += weight * marginals
-        
-        return variance - self.phi**2
         
     def get_phi(self, i: int) -> float:
         return self.phi[i]
@@ -360,49 +324,6 @@ class LocalFeatureImportance(Game):
     
     def get_phi(self, i: int) -> float:
         return self.phi[i]
-    
-    def calc_covariance(self, values, phi):
-        num_games, num_coalitions = values.shape
-        weights = np.zeros(self.n+1)
-        for length in range(self.n+1):
-            weights[length] = 1/((self.n+1)*binom(self.n, length))
-            
-        n = self.n
-        covariances = np.zeros((num_games, n,n))
-        ## calc E[XY]
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            player_coalitions = np.array([[set_ith_bit(index, player), clear_ith_bit(index, player)] for player in range(n)]).transpose()
-            marginals = values[:, player_coalitions[0]] - values[:, player_coalitions[1]]
-            covariances += weight * (marginals[:, :, np.newaxis] * marginals[:, np.newaxis, :])
-        
-        ## calc E[X]E[Y]
-        covariances -= phi[:, :, np.newaxis] * phi[:, np.newaxis, :]
-            
-        return covariances
-    
-    def calc_variance(self, values, phi):
-        num_games, num_coalitions = values.shape
-        weights = np.zeros(self.n+1)
-        for length in range(self.n+1):
-            weights[length] = 1/((self.n+1)*binom(self.n, length))
-        n = self.n
-        
-        # calc E[X^2]
-        variance = np.zeros((num_games, self.n))
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            weight = weights[length]
-            player_coalitions = np.array([[set_ith_bit(index, player), clear_ith_bit(index, player)] for player in range(n)]).transpose()
-            marginals = values[:, player_coalitions[0]] - values[:, player_coalitions[1]]
-            variance += weight * (marginals**2)
-        
-        # calc E[X^2] - E[X]^2
-        variance -= phi**2
-        return variance
 
 class UnsupervisedFeatureImportance(GlobalFeatureImportance):
     def reindex(self):
