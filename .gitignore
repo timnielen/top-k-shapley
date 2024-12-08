@@ -3,7 +3,7 @@ __pycache__
 *jpg
 *JPEG
 neuron_shapley/imagenet
-**.zip
+# **.zip
 *.pt
 datasets
 old
