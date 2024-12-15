@@ -82,7 +82,7 @@ def plot_fixedBudget(results, K, save=False, filepath="fixedK.pdf"):
     plt.rcParams['lines.markersize'] = 10
     fig, axis = plt.subplots(1, 1, figsize=(8,5), dpi=1000)
     
-    for name, (precision, precision_SE) in results:
+    for name, (K, precision, precision_SE) in results:
         axis.plot(K, precision, ".-", label=name, linewidth=2.0)
         axis.fill_between(K, (precision-precision_SE), (precision+precision_SE), alpha=.3)
         

@@ -117,5 +117,4 @@ class FixedBudgetEnvironment:
         avg_prec = np.average(precisions, axis=0)
         variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
         SE_prec = np.sqrt(variance_prec/rounds)
-        
-        return avg_prec, SE_prec
+        return K, avg_prec, SE_prec
