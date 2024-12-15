@@ -49,8 +49,8 @@ class Environment:
         SE_mse = np.sqrt(variance_mse/rounds)
         avg_percentage = np.average(percentage, axis=0)
         SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
-
-        return avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage
+        x = (np.arange(avg_prec.shape[0])+1)*step_interval
+        return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage
     
     def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
         steps = math.floor(self.T/step_interval)

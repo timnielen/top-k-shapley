@@ -13,7 +13,7 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
         axes = [axes]
     axes = {types[i]: axes[i] for i in range(len(types))}   
 
-    for name, (topk, topk_SE, mse, mse_SE, percentage, percentage_SE) in results:
+    for name, (x, topk, topk_SE, mse, mse_SE, percentage, percentage_SE) in results:
         start_index = max(math.floor(start_at_x / step_interval)-1, 0)
         topk, topk_SE, mse, mse_SE, percentage, percentage_SE = topk[start_index:], topk_SE[start_index:], mse[start_index:], mse_SE[start_index:], percentage[start_index:], percentage_SE[start_index:]
         x = (np.arange(topk.shape[0])+1+start_index)*step_interval

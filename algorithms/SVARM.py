@@ -187,7 +187,7 @@ class StratSVARM(Algorithm):
             self.phi_m[player, l] = (self.count_m[player, l] * self.phi_m[player, l] + v) / (self.count_m[player, l] + 1)
             self.count_m[player, l] += 1
             
-        self.phi = 1/self.game.n * np.sum(self.phi_p-self.phi_m,axis=1)
+        self.phi = np.sum(self.phi_p-self.phi_m,axis=1)/self.game.n
         self.save_steps(self.step_interval)
     def sample(self):
         n = self.game.n
