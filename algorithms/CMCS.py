@@ -72,10 +72,10 @@ class Selective_CMCS(CMCS):
         while self.func_calls+2 <= self.T:            
             # sample players based on uncertainty
             sorted_players = np.argsort(-self.phi)
-            border = np.zeros(n, dtype=np.float32)
-            border[sorted_players[:k]] = sorted_players[k]
-            border[sorted_players[k:]] = sorted_players[k-1]
-            # border = (self.phi[sorted_players[k-1]] + self.phi[sorted_players[k]])/2
+            # border = np.zeros(n, dtype=np.float32)
+            # border[sorted_players[:k]] = sorted_players[k]
+            # border[sorted_players[k:]] = sorted_players[k-1]
+            border = (self.phi[sorted_players[k-1]] + self.phi[sorted_players[k]])/2
             certainty = np.abs(self.phi - border) * t
             min_certainty, max_certainty = np.min(certainty), np.max(certainty)
             if min_certainty == max_certainty:
