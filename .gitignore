@@ -8,3 +8,4 @@ neuron_shapley/imagenet
 datasets
 old
 .DS_STORE
+results/data
