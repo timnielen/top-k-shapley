@@ -343,3 +343,39 @@ class UnsupervisedFeatureImportance(GlobalFeatureImportance):
             if i%1000 == 0:
                 print(i)
         return values
+    
+    
+class TestGame(Game):
+    def __init__(self, num_players):
+        self.n = num_players
+        
+        self.name = "TestGame"
+        self.values = np.array([0,-1,1,-1,0,-1,10,10])
+        # self.values = np.zeros((2**self.n))
+        # for index in range(2**self.n):
+        #     self.values[index] = np.prod(index_to_coalition(index)+1)
+        self.phi = self.exact_calculation()
+        print(self.values)
+        print([list(index_to_coalition(index)) for index in range(2**self.n)])
+        print(self.phi, np.sum(self.phi))
+        
+    def value(self, S):
+        return self.values[coalition_to_index(np.array(S))]
+    def exact_calculation(self):
+        weights = np.zeros(self.n)
+        for length in range(self.n):
+            weights[length] = 1/(self.n*binom(self.n-1, length))
+        
+        phi = np.zeros(self.n)
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            for player in range(self.n):
+                if player in coalition:
+                    phi[player] += weights[length-1] * self.values[index]
+                else:
+                    phi[player] -= weights[length] * self.values[index]
+        return phi
+        
+    def get_phi(self, i: int) -> float:
+        return self.phi[i]

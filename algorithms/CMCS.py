@@ -147,6 +147,7 @@ class CMCS_Independent(CMCS):
                 marginals[player] += self.marginal(S, player)
                 t[player] += 1
             self.update_phi(marginals / t)
+            
         self.func_calls = self.T
         self.save_steps(step_interval)
         
@@ -173,6 +174,38 @@ class CMCS_Length(CMCS):
                 marginals[player] += self.marginal(S, player)
                 t[player] += 1
             self.update_phi(marginals / t)
+        self.func_calls = self.T
+        self.save_steps(step_interval)
+        
+class Strat_CMCS(CMCS):
+    def calc_phi(self, marginals, t):
+        count = np.sum(t!=0, axis=1)
+        t[t==0] = 1
+        return np.sum(marginals / t, axis=1)/count
+    def get_top_k(self, k: int, step_interval: int = 100):
+        # initialization
+        self.step_interval = step_interval
+        n = self.game.n
+        marginals = np.zeros((n, n+1), dtype=np.float32)
+        t = np.zeros((n, n+1), dtype=np.int32)
+        
+        # precompute grand and empty coalition values
+        self.func_calls += 2
+        self.v_n = self.game.value(np.arange(n))
+        self.v_0 = self.game.value(np.array([]))
+        
+        while self.func_calls+2 <= self.T:
+            S = self.sample()
+            length = S.shape[0]
+            v_S = self.value(S)
+            for player in range(n):
+                if self.func_calls == self.T:
+                    self.update_phi(self.calc_phi(marginals, t))
+                    return
+                marginals[player, length] += self.marginal(S, player, v_S)    
+                t[player, length] += 1
+            self.update_phi(self.calc_phi(marginals, t)) 
+            
         self.func_calls = self.T
         self.save_steps(step_interval)
 
