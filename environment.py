@@ -13,6 +13,7 @@ class Environment:
         steps = math.floor(self.T/step_interval)
         precisions = np.zeros((rounds, steps))
         percentage = np.zeros((rounds, steps))
+        epsilons = np.zeros((rounds, steps))
         mse = np.zeros((rounds, steps))
         for i in range(rounds):
             game.initialize(n = self.n)
@@ -24,8 +25,13 @@ class Environment:
             assert phi_estimated.shape == (steps, self.n), (phi_estimated.shape, (steps, self.n))
             mse[i] = np.sum((phi_estimated - phi)**2, axis=1)/self.n
             
+            #epsilon score
+            border_player_value = np.sort(phi)[-k]
+            top_k_estimated = np.argsort(-phi_estimated)[:, :k]
+            epsilons[i] = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+            assert np.all(epsilons[i] >= 0), (phi, border_player_value, top_k_estimated[-1])
+            
             relevant_players, candidates, sum_topk = game.get_top_k(k) 
-            top_k_estimated = np.argpartition(algorithm.values, -k)[:, -k:]
             assert top_k_estimated.shape == (steps, k), (top_k_estimated.shape, (steps, k))
             num_correct = np.isin(top_k_estimated, relevant_players).sum(axis=1)
             num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(axis=1), a_min = 0, a_max = k-relevant_players.shape[0])
@@ -42,15 +48,22 @@ class Environment:
 
         
         avg_prec = np.average(precisions, axis=0)
-        avg_mse = np.average(mse, axis=0)
         variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
-        variance_mse = np.sum((mse-avg_mse)**2, axis=0)/(rounds-1)
         SE_prec = np.sqrt(variance_prec/rounds)
+        
+        avg_mse = np.average(mse, axis=0)
+        variance_mse = np.sum((mse-avg_mse)**2, axis=0)/(rounds-1)
         SE_mse = np.sqrt(variance_mse/rounds)
+        
         avg_percentage = np.average(percentage, axis=0)
         SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
         x = (np.arange(avg_prec.shape[0])+1)*step_interval
-        return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage
+        
+        avg_epsilon = np.average(epsilons, axis=0)
+        variance_epsilon = np.sum((epsilons-avg_epsilon)**2, axis=0)/(rounds-1)
+        SE_epsilon = np.sqrt(variance_epsilon/rounds)
+        
+        return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage, avg_epsilon, SE_epsilon
     
     def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
         steps = math.floor(self.T/step_interval)

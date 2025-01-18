@@ -13,9 +13,10 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
         axes = [axes]
     axes = {types[i]: axes[i] for i in range(len(types))}   
 
-    for name, (x, topk, topk_SE, mse, mse_SE, percentage, percentage_SE) in results:
+    for name, (x, topk, topk_SE, mse, mse_SE, percentage, percentage_SE, epsilon, epsilon_SE) in results:
         start_index = max(math.floor(start_at_x / step_interval)-1, 0)
         topk, topk_SE, mse, mse_SE, percentage, percentage_SE = topk[start_index:], topk_SE[start_index:], mse[start_index:], mse_SE[start_index:], percentage[start_index:], percentage_SE[start_index:]
+        epsilon, epsilon_SE = epsilon[start_index:], epsilon_SE[start_index:]
         x = (np.arange(topk.shape[0])+1+start_index)*step_interval
         if "topk" in types:
             axes["topk"].plot(x, topk, ".-", label=name, linewidth=2.0)
@@ -26,6 +27,9 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
         if "mse" in types:
             axes["mse"].plot(x, mse, ".-", label=name, linewidth=2.0)
             axes["mse"].fill_between(x, (mse-mse_SE), (mse+mse_SE), alpha=.3)
+        if "epsilon" in types:
+            axes["epsilon"].plot(x, epsilon, ".-", label=name, linewidth=2.0)
+            axes["epsilon"].fill_between(x, (epsilon-epsilon_SE), (epsilon+epsilon_SE), alpha=.3)
     
     handles, labels = axes[types[0]].get_legend_handles_labels()
     fig.legend(handles, labels, loc='lower center', ncols=4, bbox_to_anchor=(0.5, -0.15))
@@ -39,6 +43,9 @@ def plot(results, step_interval, types = ["topk", "mse"], metric="ratio", save=F
     if "mse" in types:
         axes["mse"].set_xlabel("T")
         axes["mse"].set_ylabel("MSE")
+    if "epsilon" in types:
+        axes["epsilon"].set_xlabel("T")
+        axes["epsilon"].set_ylabel("epsilon")
 
     if save:
         plt.savefig(filepath, bbox_inches='tight')
