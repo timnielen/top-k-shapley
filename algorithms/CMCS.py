@@ -194,17 +194,18 @@ class Strat_CMCS(CMCS):
         self.v_n = self.game.value(np.arange(n))
         self.v_0 = self.game.value(np.array([]))
         
-        while self.func_calls+2 <= self.T:
-            S = self.sample()
-            length = S.shape[0]
-            v_S = self.value(S)
-            for player in range(n):
-                if self.func_calls == self.T:
-                    self.update_phi(self.calc_phi(marginals, t))
-                    return
-                marginals[player, length] += self.marginal(S, player, v_S)    
-                t[player, length] += 1
-            self.update_phi(self.calc_phi(marginals, t)) 
+        
+        while self.func_calls+2*(n+1) <= self.T:
+            for length in range(n+1):
+                S = self.sample(length)
+                v_S = self.value(S)
+                for player in range(n):
+                    if self.func_calls == self.T:
+                        self.update_phi(self.calc_phi(marginals, t))
+                        return
+                    marginals[player, length] += self.marginal(S, player, v_S)    
+                    t[player, length] += 1
+                self.update_phi(self.calc_phi(marginals, t)) 
             
         self.func_calls = self.T
         self.save_steps(step_interval)
