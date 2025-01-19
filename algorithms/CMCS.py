@@ -116,9 +116,8 @@ class CMCS_Dependent(CMCS):
         while self.func_calls+2 <= self.T:
             S = self.sample()
             for player in range(n):
-                if self.func_calls == self.T:
-                    self.update_phi(marginals / t)
-                    return
+                if self.func_calls+2 > self.T:
+                    break
                 marginals[player] += self.marginal(S, player)
                 t[player] += 1
             self.update_phi(marginals / t)
@@ -140,9 +139,8 @@ class CMCS_Independent(CMCS):
         
         while self.func_calls+2 <= self.T:
             for player in range(n):
-                if self.func_calls == self.T:
-                    self.update_phi(marginals / t)
-                    return
+                if self.func_calls+2 > self.T:
+                    break
                 S = self.sample()
                 marginals[player] += self.marginal(S, player)
                 t[player] += 1
@@ -167,9 +165,8 @@ class CMCS_Length(CMCS):
         while self.func_calls+2 <= self.T:
             length = np.random.randint(n+1)
             for player in range(n):
-                if self.func_calls == self.T:
-                    self.update_phi(marginals / t)
-                    return
+                if self.func_calls+2 > self.T:
+                    break
                 S = self.sample(length=length)
                 marginals[player] += self.marginal(S, player)
                 t[player] += 1

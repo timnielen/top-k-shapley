@@ -115,19 +115,34 @@ class FixedBudgetEnvironment:
         
     def evaluate(self, game: Game, algorithm: Algorithm, K: np.ndarray, rounds:int=100):
         precisions = np.zeros((rounds, K.shape[0]))
+        epsilons = np.zeros((rounds, K.shape[0]))
         for i in range(rounds):
             game.initialize(n = self.n)
             for index_k, k in enumerate(K):
                 algorithm.initialize(game, self.budget)
                 algorithm.get_top_k(k, step_interval=self.budget)
                 
+                phi = np.array([game.get_phi(i) for i in range(self.n)])
+                phi_estimated = np.array(algorithm.values)
+                top_k_estimated = np.argsort(-phi_estimated)[0, :k]
+                
                 relevant_players, candidates, sum_topk = game.get_top_k(k) 
-                top_k_estimated = np.argpartition(algorithm.values, -k)[0, -k:]
                 num_correct = np.isin(top_k_estimated, relevant_players).sum()
                 num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(), a_min = 0, a_max = k-relevant_players.shape[0])
                 precisions[i, index_k] = num_correct/k
                 
+                
+                #epsilon score
+                border_player_value = np.sort(phi)[-k]
+                epsilons[i, index_k] = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+                assert epsilons[i, index_k] >= 0, (phi, border_player_value, top_k_estimated[-1])
+                
         avg_prec = np.average(precisions, axis=0)
         variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
         SE_prec = np.sqrt(variance_prec/rounds)
-        return K, avg_prec, SE_prec
+        
+        avg_epsilon = np.average(epsilons, axis=0)
+        variance_epsilon = np.sum((epsilons-avg_epsilon)**2, axis=0)/(rounds-1)
+        SE_epsilon = np.sqrt(variance_epsilon/rounds)
+        
+        return K, avg_prec, SE_prec, avg_epsilon, SE_epsilon
