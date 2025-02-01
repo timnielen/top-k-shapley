@@ -27,8 +27,12 @@ class Environment:
             
             #epsilon score
             border_player_value = np.sort(phi)[-k]
-            top_k_estimated = np.argsort(-phi_estimated)[:, :k]
-            epsilons[i] = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+            sorted_estimated = np.argsort(-phi_estimated)
+            top_k_estimated = sorted_estimated[:, :k]
+            rest_estimated = sorted_estimated[:, k:]
+            lower_epsilon = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+            upper_epsilon = np.max(phi[rest_estimated] - border_player_value, axis=-1)
+            epsilons[i] = np.max(np.concatenate((lower_epsilon[:, None], upper_epsilon[:, None]), axis=-1), axis=-1)
             assert np.all(epsilons[i] >= 0), (phi, border_player_value, top_k_estimated[-1])
             
             relevant_players, candidates, sum_topk = game.get_top_k(k) 
