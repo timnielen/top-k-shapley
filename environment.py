@@ -128,7 +128,9 @@ class FixedBudgetEnvironment:
                 
                 phi = np.array([game.get_phi(i) for i in range(self.n)])
                 phi_estimated = np.array(algorithm.values)
-                top_k_estimated = np.argsort(-phi_estimated)[0, :k]
+                sorted_estimated = np.argsort(-phi_estimated)
+                top_k_estimated = sorted_estimated[0, :k]
+                rest_estimated = sorted_estimated[0, k:]
                 
                 relevant_players, candidates, sum_topk = game.get_top_k(k) 
                 num_correct = np.isin(top_k_estimated, relevant_players).sum()
@@ -138,7 +140,9 @@ class FixedBudgetEnvironment:
                 
                 #epsilon score
                 border_player_value = np.sort(phi)[-k]
-                epsilons[i, index_k] = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+                lower_epsilon = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+                upper_epsilon = np.max(phi[rest_estimated] - border_player_value, axis=-1)
+                epsilons[i, index_k] = np.max([lower_epsilon, upper_epsilon], axis=-1)
                 assert epsilons[i, index_k] >= 0, (phi, border_player_value, top_k_estimated[-1])
                 
         avg_prec = np.average(precisions, axis=0)
