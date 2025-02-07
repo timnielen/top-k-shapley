@@ -245,15 +245,15 @@ class Variance_CMCS(CMCS):
                 # pair_idx = np.argmax(cdf_values)
                 # selected_players = np.array([topk[pair_idx // (n-k)], rest[pair_idx % (n-k)]])
                 
-                certainty = 1-cdf_values
+                # certainty = 1-cdf_values
                 # print(certainty.shape)
                 
-                min_certainty, max_certainty = np.min(certainty), np.max(certainty)
-                if min_certainty == max_certainty: # if all pairs are equally certain just evaluate all
+                min_cdf, max_cdf = np.min(cdf_values), np.max(cdf_values)
+                if min_cdf == max_cdf: # if all pairs are equally certain just evaluate all
                     selected_players = np.arange(n)
                 else:
-                    weights = (max_certainty - certainty) / (max_certainty - min_certainty)
-                    selected_pairs = (np.random.rand(*certainty.shape) < weights).nonzero()
+                    weights = (cdf_values - min_cdf) / (max_cdf - min_cdf)
+                    selected_pairs = (np.random.rand(*cdf_values.shape) < weights).nonzero()
                     selected_i = np.unique(topk[selected_pairs[0]])
                     selected_j = np.unique(rest[selected_pairs[1]])
                     # print(selected_i, selected_j)
