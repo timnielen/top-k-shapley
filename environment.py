@@ -68,6 +68,34 @@ class Environment:
         SE_epsilon = np.sqrt(variance_epsilon/rounds)
         
         return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage, avg_epsilon, SE_epsilon
+  
+    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, rounds:int=100):
+        func_calls = np.zeros(rounds, dtype=np.int32)
+        
+        for round in range(rounds):
+            game.initialize(n = self.n)
+            algorithm.initialize(game, -1) #infinite budget
+            algorithm.get_top_k(k, np.inf)
+            print(algorithm.func_calls)
+            func_calls[round] = algorithm.func_calls
+            
+            phi = np.array([game.get_phi(i) for i in range(self.n)])
+            sorted = np.argsort(-phi)
+            top_k = np.sort(sorted[:k])
+            
+            phi_estimated = algorithm.phi
+            sorted_estimated = np.argsort(-phi_estimated)
+            top_k_estimated = np.sort(sorted_estimated[:k])
+            
+            print("topk_real:   ", top_k)
+            print("topk_approx: ", top_k_estimated)
+            
+        avg_func_calls = np.mean(func_calls)
+        variance = np.sum((func_calls-avg_func_calls)**2)/(rounds-1)
+        SE_func_calls = np.sqrt(variance/rounds)
+        
+        return avg_func_calls, SE_func_calls
+        
     
     def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
         steps = math.floor(self.T/step_interval)
