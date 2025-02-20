@@ -2,6 +2,7 @@ from game import Game
 from algorithms.algorithm import Algorithm
 import numpy as np
 import math
+from tqdm import tqdm
 
 class Environment:
     def __init__(self, n: int, budget: int, metric="ratio"):
@@ -69,32 +70,37 @@ class Environment:
         
         return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage, avg_epsilon, SE_epsilon
   
-    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, rounds:int=100):
+    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, epsilon, rounds:int=100, ):
         func_calls = np.zeros(rounds, dtype=np.int32)
-        
-        for round in range(rounds):
-            game.initialize(n = self.n)
-            algorithm.initialize(game, -1) #infinite budget
-            algorithm.get_top_k(k, np.inf)
-            print(algorithm.func_calls)
-            func_calls[round] = algorithm.func_calls
-            
-            phi = np.array([game.get_phi(i) for i in range(self.n)])
-            sorted = np.argsort(-phi)
-            top_k = np.sort(sorted[:k])
-            
-            phi_estimated = algorithm.phi
-            sorted_estimated = np.argsort(-phi_estimated)
-            top_k_estimated = np.sort(sorted_estimated[:k])
-            
-            print("topk_real:   ", top_k)
-            print("topk_approx: ", top_k_estimated)
+        num_correct = 0
+        with tqdm(range(rounds)) as pbar:
+            for round in pbar:
+                game.initialize(n = self.n)
+                algorithm.initialize(game, -1) #infinite budget
+                algorithm.get_top_k(k, np.inf)
+                func_calls[round] = algorithm.func_calls
+                
+                phi = np.array([game.get_phi(i) for i in range(self.n)])
+                sorted = np.argsort(-phi)
+                top_k, rest = np.sort(sorted[:k]), sorted[k:]
+                
+                phi_estimated = algorithm.phi
+                sorted_estimated = np.argsort(-phi_estimated)
+                top_k_estimated, rest_estimated = np.sort(sorted_estimated[:k]), sorted_estimated[k:]
+                
+                phi_k = phi[sorted][k-1]
+                assert phi_k == np.min(phi[top_k])
+                inclusion = np.min(phi[top_k_estimated]) >= phi_k - epsilon
+                exclusion = np.max(phi[rest_estimated]) <= phi_k + epsilon
+                num_correct += inclusion and exclusion
+                
+                pbar.set_postfix(topk_real=f"{top_k}", topk_approx=f"{top_k_estimated}", func_calls=f"{func_calls[round]}", accuracy=f"{num_correct/(round+1)}")
             
         avg_func_calls = np.mean(func_calls)
         variance = np.sum((func_calls-avg_func_calls)**2)/(rounds-1)
         SE_func_calls = np.sqrt(variance/rounds)
         
-        return avg_func_calls, SE_func_calls
+        return avg_func_calls, SE_func_calls, num_correct/rounds
         
     
     def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
