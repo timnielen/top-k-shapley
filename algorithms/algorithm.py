@@ -76,6 +76,7 @@ class PAC_Algorithm(Algorithm):
         self.upper_bound = self.phi + c
         self.topk_low = np.min(self.lower_bound[topk])
         self.rest_high = np.max(self.upper_bound[rest])
+        # print(self.rest_high - self.topk_low)
             
     def is_PAC(self):
         return self.rest_high - self.topk_low <= self.epsilon

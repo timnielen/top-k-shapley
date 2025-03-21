@@ -194,8 +194,10 @@ class Greedy_CMCS(CMCS):
         
         diff_variance = (sum_diff_squared - (sum_diff**2)/count_diff)/(count_diff-1)
         cdf_values = scipy.stats.norm.cdf(-sum_diff / np.sqrt(diff_variance*count_diff), loc=0, scale=1)
+        cdf_values[diff_variance == 0] = 0 # if we ahve zero variance current partition is probably correct
         
         min_cdf, max_cdf = np.min(cdf_values), np.max(cdf_values)
+        # print(min_cdf, max_cdf, min_cdf != max_cdf)
         if min_cdf != max_cdf: # be greedy only if pairs have different probabilities 
             weights = (cdf_values - min_cdf) / (max_cdf - min_cdf)
             selected_pairs = (np.random.rand(*cdf_values.shape) < weights).nonzero()

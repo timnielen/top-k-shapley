@@ -5,7 +5,7 @@ import math
 from tqdm import tqdm
 
 class Environment:
-    def __init__(self, n: int, budget: int, metric="ratio"):
+    def __init__(self, n: int =None, budget: int = 1500, metric="ratio"):
         self.T = budget
         self.n = n
         self.metric = metric
@@ -70,17 +70,18 @@ class Environment:
         
         return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage, avg_epsilon, SE_epsilon
   
-    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, epsilon, rounds:int=100, ):
+    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, epsilon, rounds:int=100 ):
         func_calls = np.zeros(rounds, dtype=np.int32)
         num_correct = 0
         with tqdm(range(rounds)) as pbar:
             for round in pbar:
-                game.initialize(n = self.n)
+                n = game.n
+                game.initialize(n)
                 algorithm.initialize(game, -1) #infinite budget
                 algorithm.get_top_k(k, np.inf)
                 func_calls[round] = algorithm.func_calls
                 
-                phi = np.array([game.get_phi(i) for i in range(self.n)])
+                phi = np.array([game.get_phi(i) for i in range(n)])
                 sorted = np.argsort(-phi)
                 top_k, rest = np.sort(sorted[:k]), sorted[k:]
                 
@@ -99,6 +100,7 @@ class Environment:
         avg_func_calls = np.mean(func_calls)
         variance = np.sum((func_calls-avg_func_calls)**2)/(rounds-1)
         SE_func_calls = np.sqrt(variance/rounds)
+        print(avg_func_calls, SE_func_calls, num_correct/rounds)
         
         return avg_func_calls, SE_func_calls, num_correct/rounds
         

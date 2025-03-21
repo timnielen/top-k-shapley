@@ -164,6 +164,7 @@ class GlobalFeatureImportance(Game):
                 np.save(shapley_values_path, self.phi)
                 
         else: 
+            self.df = pd.read_csv(filepath)
             self.values = self.reindex()
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
