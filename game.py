@@ -23,6 +23,37 @@ class Game:
         candidates = sorted[k-1:][phi[sorted[k-1:]] == border]
         sum_topk = np.sum(phi[sorted[:k]])
         return relevant_players, candidates, sum_topk
+    
+    def reindex(self):
+        '''given the dataframe obtained from the game's csv file compute an array containing all coalition values
+        where the binary representation of the index is indicative of the coalition.
+        E.g.: 
+            binary(0) = 0000 -> coalition []
+            binary(1) = 0001 -> coalition [0]
+            binary(2) = 0010 -> coalition [1]
+            binary(5) = 0101 -> coalition [0,2]
+        '''
+        pass
+    
+    def exact_calculation(self):
+        '''
+        - calculate exact shapley values for each player using all values.
+        - assumes values to be reindexed
+        '''
+        weights = np.zeros(self.n)
+        for length in range(self.n):
+            weights[length] = 1/(self.n*binom(self.n-1, length))
+        
+        phi = np.zeros(self.n)
+        for index in range(2**self.n):
+            coalition = index_to_coalition(index)
+            length = coalition.shape[0]
+            for player in range(self.n):
+                if player in coalition:
+                    phi[player] += weights[length-1] * self.values[index]
+                else:
+                    phi[player] -= weights[length] * self.values[index]
+        return phi
 
 class GlobalFeatureImportance(Game):
     '''uses precomputed coalition values stored in a csv document'''
@@ -78,21 +109,6 @@ class GlobalFeatureImportance(Game):
             if index%1000 == 0:
                 print(index)
         return values
-    def exact_calculation(self):
-        weights = np.zeros(self.n)
-        for length in range(self.n):
-            weights[length] = 1/(self.n*binom(self.n-1, length))
-        
-        phi = np.zeros(self.n)
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            for player in range(self.n):
-                if player in coalition:
-                    phi[player] += weights[length-1] * self.values[index]
-                else:
-                    phi[player] -= weights[length] * self.values[index]
-        return phi
         
     def get_phi(self, i: int) -> float:
         return self.phi[i]
@@ -207,22 +223,6 @@ class LocalFeatureImportance(Game):
     
     def value(self, S):
         return self.values[coalition_to_index(np.array(S))]
-    
-    def exact_calculation(self, values):
-        weights = np.zeros(self.n)
-        for length in range(self.n):
-            weights[length] = 1/(self.n*binom(self.n-1, length))
-        
-        phi = np.zeros(self.n)
-        for index in range(2**self.n):
-            coalition = index_to_coalition(index)
-            length = coalition.shape[0]
-            for player in range(self.n):
-                if player in coalition:
-                    phi[player] += weights[length-1] * values[index]
-                else:
-                    phi[player] -= weights[length] * values[index]
-        return phi
     
     def get_phi(self, i: int) -> float:
         return self.phi[i]
