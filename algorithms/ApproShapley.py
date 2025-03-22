@@ -4,46 +4,37 @@ import numpy as np
 class ApproShapley(Algorithm):
     def __init__(self, optimize: bool=True):
         self.optimize = optimize
-    def get_top_k(self, k: int, step_interval: int = 100):
-        if(self.optimize):
-            return self.optimized(k, step_interval)
-        return self.not_optimized(k, step_interval)
-    def optimized(self, k: int, step_interval: int = 100):
-        n = self.game.n
-        self.phi = np.zeros(n)
-        t=0
-        v_n = self.value(np.arange(n))
-        v_0 = self.value(np.array([]))
-        while(True):
-            O = np.arange(n)
-            np.random.shuffle(O)
-            pre = v_n
-            for i in range(n):
-                player = O[i]
-                if i == n-1:
-                    value = v_0
-                else:
-                    if(self.func_calls == self.T):
-                        return
-                    value = self.value(O[i+1:])
-                self.phi[player] = (t*self.phi[player] + pre - value)/(t+1)
-                pre = value
-                self.save_steps(step_interval)
-            t += 1
-            
+    def get_top_k(self, k: int):
+        assert self.budget != -1, "The algorithm doesn't have an early stopping condition!"
+        if(self.optimize): # the optimized version reuses coalition values along the permutation
+            return self.optimized(k)
+        return self.not_optimized(k)
     
-    def not_optimized(self, k: int, step_interval: int = 100):
+    def optimized(self, k: int):
         n = self.game.n
-        self.phi = np.zeros(n)
-        t=np.zeros(n)
-        while(self.func_calls+2 <= self.T):
-            O = np.arange(n)
-            np.random.shuffle(O)
+        while(True):
+            permutation = np.arange(n)
+            np.random.shuffle(permutation)
+            pre = self.v_n
             for i in range(n):
-                if(self.func_calls+2 > self.T):
-                    break
-                player = O[i]
-                t[player] += 1
-                m = self.value(O[:i+1]) - self.value(O[:i])
-                self.phi[player] = ((t[player]-1)*self.phi[player] + m)/t[player]
-                self.save_steps(step_interval)
+                player = permutation[i]
+                if(self.func_calls == self.budget):
+                    self.save_steps(final = True)
+                    return
+                value = self.value(permutation[i+1:])
+                marginal = pre - value
+                self.update_player(player, marginal)
+                pre = value
+    
+    def not_optimized(self, k: int):
+        n = self.game.n
+        while(True):
+            permutation = np.arange(n)
+            np.random.shuffle(permutation)
+            for i in range(n):
+                if(self.func_calls+2 > self.budget):
+                    self.save_steps(final = True)
+                    return
+                player = permutation[i]
+                marginal = self.value(permutation[:i+1]) - self.value(permutation[:i])
+                self.update_player(player, marginal)

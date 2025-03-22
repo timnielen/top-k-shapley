@@ -3,23 +3,26 @@ import numpy as np
 
 
 class SHAP_K(PAC_Algorithm):
-    def get_top_k(self, k: int, step_interval: int = 100):
-        # initialization
-        self.step_interval = step_interval
+    '''
+    Implementation of SamplingSHAP@K algorithm.
+    Kariyappa, Sanjay, et al. "SHAP@ k: efficient and probably approximately correct (PAC) identification of top-k features." 
+    Proceedings of the AAAI Conference on Artificial Intelligence. 
+    Vol. 38. No. 12. 2024.
+    '''
+    def get_top_k(self, k: int):
         n = self.game.n
         
+        # warm-up using permutation sampling until t_min is reached and CLT is valid
         for m in range(self.t_min):
-            partition = np.arange(n)
-            np.random.shuffle(partition)
+            permutation  = np.arange(n)
+            np.random.shuffle(permutation)
             pre = self.v_n
             for i in range(n):
-                player = partition[i]
-                if i == n-1:
-                    value = self.v_0
-                else:
-                    if(self.func_calls == self.T):
-                        return
-                    value = self.value(partition[i+1:])
+                player = permutation[i]
+                if(self.func_calls == self.budget):
+                    self.save_steps(final=True)
+                    return
+                value = self.value(permutation[i+1:])
                 marginal = pre - value
                 self.update_player(player, marginal)
                 pre = value
@@ -27,21 +30,23 @@ class SHAP_K(PAC_Algorithm):
         topk, rest = self.partition(k)
         self.update_bounds(topk, rest)
         
-        def update_player(player, partition):
-            index = np.argwhere(partition == player)[0][0]
-            marginal = self.value(partition[index:]) - self.value(partition[index+1:])
+        def update_player(player, permutation):
+            '''wrapper around self.update_player to update a player using a permutation of [n] instead of a coalition'''
+            index = np.argwhere(permutation == player)[0][0]
+            marginal = self.value(permutation[index:]) - self.value(permutation[index+1:])
             self.update_player(player, marginal)        
             
-        while self.func_calls+4 <= self.T or (self.T == -1 and not self.is_PAC()):
+        while self.func_calls+4 <= self.budget or (self.budget == -1 and not self.is_PAC()):
+            # select the two players of the two partitions with highest overlap in confidence intervals
             h = topk[np.argmin(self.lower_bound[topk])]
             l = rest[np.argmax(self.upper_bound[rest])]
             
-            partition = np.arange(n)
-            np.random.shuffle(partition)
-            update_player(h, partition)
-            update_player(l, partition)
+            permutation = np.arange(n)
+            np.random.shuffle(permutation)
+            update_player(h, permutation)
+            update_player(l, permutation)
             
             topk, rest = self.partition(k)
             self.update_bounds(topk, rest)
                 
-        self.save_steps(step_interval, final=True)
+        self.save_steps(final=True)
