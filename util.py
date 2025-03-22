@@ -6,10 +6,26 @@ def binom(n, k):
 
 
 def index_to_coalition(index):
+    '''
+    converts an index to a coalition using its binary representation
+    E.g.: 
+        binary(0) = 0000 -> coalition []
+        binary(1) = 0001 -> coalition [0]
+        binary(2) = 0010 -> coalition [1]
+        binary(5) = 0101 -> coalition [0,2]
+    '''
     view = np.array([index]).view(np.uint8)
     return np.where(np.unpackbits(view, bitorder='little'))[0]
 
 def coalition_to_index(coalition):
+    '''
+    converts a coalition to an index using its binary representation
+    E.g.: 
+        coalition [] -> 0000 = binary(0) -> 0
+        coalition [0] -> 0001 = binary(1) -> 1
+        coalition [1] -> 0010 = binary(2) -> 2
+        coalition [0,2] -> 0101 = binary(5) -> 5
+    '''
     if(coalition.shape[0] == 0):
         return 0
     return np.sum(1 << coalition)
