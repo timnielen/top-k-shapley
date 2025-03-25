@@ -1,93 +1,177 @@
 from game import Game
-from algorithms.algorithm import Algorithm
+from algorithms.algorithm import Algorithm, PAC_Algorithm
 import numpy as np
 import math
 from tqdm import tqdm
 
-class Environment:
-    def __init__(self, n: int =None, budget: int = 1500, metric="ratio"):
-        self.T = budget
-        self.n = n
-        self.metric = metric
+class EvaluationEnvironment:
+    def mse(self, phi, phi_estimated):
+        '''
+        returns the mean-squared error of the estimated shapley values
 
-    def evaluate(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
-        steps = math.floor(self.T/step_interval)
-        precisions = np.zeros((rounds, steps))
-        percentage = np.zeros((rounds, steps))
-        epsilons = np.zeros((rounds, steps))
-        mse = np.zeros((rounds, steps))
-        for i in range(rounds):
-            game.initialize(n = self.n)
-            algorithm.initialize(game, self.T)
-            algorithm.get_top_k(k, step_interval)
+        Args:
+            phi (float array of shape (n,)): the actual shapley values of the game
+            phi_estimated (float array of shape (steps,n)): the estimated shapley values of the game for each step
+        
+        Returns:
+            mse (array of shape (steps,)): the mean squared error at every step
+        '''
+        return np.mean((phi_estimated - phi)**2, axis=1)
+    
+    def epsilon_score(self, phi, border_player_value, top_k_estimated, rest_estimated):
+        '''
+        evaluates the epsilon required for the estimated solution to be epsilon approximate
+
+        Args:
+            phi (float array of shape (n,)): the actual shapley values of the game
+            border_player_value (float): the kth largest shapley value
+            top_k_estimated (int array of shape (steps, k)): the indices of the players identified as topk players at each step
+            rest_estimated (int array of shape (steps, n-k)): the indices of the players identified as non-topk players at each step
+        
+        Returns:
+            epsilon (array of shape (steps,)): the required epsilon>=0 at each step
+        '''
+
+        lower_epsilon = np.max(border_player_value - phi[top_k_estimated], axis=-1)
+        upper_epsilon = np.max(phi[rest_estimated] - border_player_value, axis=-1)
+        return np.max(np.concatenate((lower_epsilon[:, None], upper_epsilon[:, None]), axis=-1), axis=-1)
+    
+    def precision_score(self, relevant_players, candidates, top_k_estimated, k):
+        '''
+        evaluates the precision of the algorithm, i.e. whats the ratio of correctly identified topk players (ratio scale) 
+        or did the algorithm find a correct solution (numeric scale)?
+
+        Args:
+            relevant_players (int array of shape (steps, h<k)): the players that are guaranteed to be part of the topk
+            candidates (int array of shape (steps, l)): the players with a shapley value equal to the border, i.e. k-h of which can be chosen arbitrarily
+            top_k_estimated (int array of shape (steps, k)): the indices of the players identified as topk players at each step
+            k (int): the topk index
+        
+        Returns:
+            ratio (float array of shape (steps,)): the ratio of correctly identified topk players at each step
+            numeric (bool array of shape (steps,)): did the algorithm find a correct solution at each step
+        '''
+        num_correct = np.isin(top_k_estimated, relevant_players).sum(axis=1)
+        num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(axis=1), a_min = 0, a_max = k-relevant_players.shape[0])
+        ratio = num_correct / k
+        numeric = num_correct == k
+        return ratio, numeric
+    
+    def average_measure(self, measure):
+        '''averages a measure over a number of experiments
+        
+        Args:
+            measure (float array of shape (num_experiments, steps)): the value of the measure in each experiment and at each step of the experiment
             
-            phi = np.array([game.get_phi(i) for i in range(self.n)])
-            phi_estimated = np.array(algorithm.values)
-            assert phi_estimated.shape == (steps, self.n), (phi_estimated.shape, (steps, self.n))
-            mse[i] = np.sum((phi_estimated - phi)**2, axis=1)/self.n
+        Returns:
+            average (float array of shape (steps,)): average of the measure at each experiment step
+            se (float array of shape (steps,)): standard error of the average measure at each step obtained through the sample variance
+        '''
+
+        num_experiments, steps = measure.shape
+        average = np.average(measure, axis=0)
+        variance = np.sum((measure-average)**2, axis=0)/(num_experiments-1)
+        se = np.sqrt(variance/num_experiments)
+        return average, se
+
+
+    def evaluate_fixed_k(self, game: Game, algorithm: Algorithm, k: int, budget: int, step_interval:int=100, num_experiments:int=100):
+        '''
+            evaluates an algorithm's performance on a cooperative game at different steps 
+            and averages over multiple experiments to obtain the expected performance
+
+            Returns:
+                x (int array of shape (num_steps,)): the consumed budget at each step (for plotting purposes)
+                result (dict): a dictionary containing the average and standard error of different measures ("ratio", "numeric", "epsilon", "mse") at each step 
+        '''
+
+        steps = budget // step_interval
+        numeric_scale = np.zeros((num_experiments, steps))
+        ratio_scale = np.zeros((num_experiments, steps))
+        epsilons = np.zeros((num_experiments, steps))
+        mse = np.zeros((num_experiments, steps))
+        n = game.n
+        for experiment in range(num_experiments):
+            game.initialize()
+            algorithm.initialize(game, budget, step_interval)
+            algorithm.get_top_k(k)
+            assert len(algorithm.values) == steps
             
-            #epsilon score
-            border_player_value = np.sort(phi)[-k]
+            phi = game.get_phi()
+            phi_estimated = np.array(algorithm.values) 
+
+            mse[experiment] = self.mse(phi, phi_estimated)
+            
             sorted_estimated = np.argsort(-phi_estimated)
             top_k_estimated = sorted_estimated[:, :k]
             rest_estimated = sorted_estimated[:, k:]
-            lower_epsilon = np.max(border_player_value - phi[top_k_estimated], axis=-1)
-            upper_epsilon = np.max(phi[rest_estimated] - border_player_value, axis=-1)
-            epsilons[i] = np.max(np.concatenate((lower_epsilon[:, None], upper_epsilon[:, None]), axis=-1), axis=-1)
-            assert np.all(epsilons[i] >= 0), (phi, border_player_value, top_k_estimated[-1])
-            
-            relevant_players, candidates, sum_topk = game.get_top_k(k) 
-            assert top_k_estimated.shape == (steps, k), (top_k_estimated.shape, (steps, k))
-            num_correct = np.isin(top_k_estimated, relevant_players).sum(axis=1)
-            num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(axis=1), a_min = 0, a_max = k-relevant_players.shape[0])
-            
-            # print(relevant_players, candidates, top_k_estimated[-1], num_correct[-1])
-            
-            if self.metric == "ratio":
-                precisions[i] = num_correct/k
-            else:
-                precisions[i] = num_correct == k
-            
-            percentage[i] = np.sum(phi[top_k_estimated], axis=1) / sum_topk
-                
 
+            relevant_players, candidates, border = game.get_top_k(k) 
+            epsilons[experiment] = self.epsilon_score(phi, border, top_k_estimated, rest_estimated)
+            ratio_scale[experiment], numeric_scale[experiment] = self.precision_score(relevant_players, candidates, top_k_estimated, k)               
+
+        result = {}
+        result["ratio"] = self.average_measure(ratio_scale)
+        result["numeric"] = self.average_measure(numeric_scale)
+        result["mse"] = self.average_measure(mse)
+        result["epsilon"] = self.average_measure(epsilons)
+        x = (np.arange(steps)+1)*step_interval
         
-        avg_prec = np.average(precisions, axis=0)
-        variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
-        SE_prec = np.sqrt(variance_prec/rounds)
+        return x, result
+    
+    def evaluate_fixed_budget(self, game: Game, algorithm: Algorithm, K: np.ndarray, budget:int=1500, num_experiments:int=100):
+        '''evaluates the algorithms performance using multiple values of K given a fixed budget
+
+        Returns:
+            K (array): returns the input K (for plotting purposes)
+            result (dict): contains the average and standard error of each measure ("ratio", "numeric", "epsilon") 
+        '''
+        measures = ["ratio", "numeric", "epsilon"]
+        result = {}
+        for measure in measures:
+            result[measure] = ([], [])
+        with tqdm(K) as pbar:
+            for k in pbar:
+                _, sub_result = self.evaluate_fixed_k(game, algorithm, k, budget, step_interval=-1, num_experiments=num_experiments)
+                for measure in measures:
+                    avg, se = sub_result[measure]
+                    result[measure][0] += [avg[-1]]
+                    result[measure][1] += [se[-1]]
+                pbar.set_postfix(k=k)
+        for measure in measures:
+            avg, se = result[measure]
+            result[measure][0] = np.array(avg)
+            result[measure][1] = np.array(se)
+            assert np.array(avg).shape == (len(K),)
+            assert np.array(se).shape == (len(K),)
+        return K, result
+
+    def evaluate_PAC(self, game: Game, algorithm: PAC_Algorithm, k: int, epsilon, num_experiments:int=100):
+        '''evaluates the number of budget required for an algorithm to produce a probably approximatly correct solution averaged over multiple experiments
         
-        avg_mse = np.average(mse, axis=0)
-        variance_mse = np.sum((mse-avg_mse)**2, axis=0)/(rounds-1)
-        SE_mse = np.sqrt(variance_mse/rounds)
-        
-        avg_percentage = np.average(percentage, axis=0)
-        SE_percentage = np.sqrt(np.sum((percentage-avg_percentage)**2, axis=0)/(rounds-1))
-        x = (np.arange(avg_prec.shape[0])+1)*step_interval
-        
-        avg_epsilon = np.average(epsilons, axis=0)
-        variance_epsilon = np.sum((epsilons-avg_epsilon)**2, axis=0)/(rounds-1)
-        SE_epsilon = np.sqrt(variance_epsilon/rounds)
-        
-        return x, avg_prec, SE_prec, avg_mse, SE_mse, avg_percentage, SE_percentage, avg_epsilon, SE_epsilon
-  
-    def evaluate_PAC(self, game: Game, algorithm: Algorithm, k: int, epsilon, rounds:int=100 ):
-        func_calls = np.zeros(rounds, dtype=np.int32)
+        Returns:
+            average (float): average number of value function calls required
+            se (float): standard error of the average obtained thrugh the sample variance
+            accuracy (float): the actual ratio of approximately correct solutions
+        '''
+        func_calls = np.zeros(num_experiments, dtype=np.int32)
         num_correct = 0
-        with tqdm(range(rounds)) as pbar:
+        with tqdm(range(num_experiments)) as pbar:
             for round in pbar:
                 n = game.n
                 game.initialize(n)
-                algorithm.initialize(game, -1) #infinite budget
-                algorithm.get_top_k(k, np.inf)
+                algorithm.initialize(game, budget=-1, step_interval=-1) #infinite budget
+                algorithm.get_top_k(k)
+                assert len(algorithm.values) == 1
                 func_calls[round] = algorithm.func_calls
                 
-                phi = np.array([game.get_phi(i) for i in range(n)])
+                phi = game.get_phi()
                 sorted = np.argsort(-phi)
-                top_k, rest = np.sort(sorted[:k]), sorted[k:]
+                top_k, rest = sorted[:k], sorted[k:]
                 
-                phi_estimated = algorithm.phi
+                phi_estimated = algorithm.phi # same as algorithm.values[-1]
                 sorted_estimated = np.argsort(-phi_estimated)
-                top_k_estimated, rest_estimated = np.sort(sorted_estimated[:k]), sorted_estimated[k:]
+                top_k_estimated, rest_estimated = sorted_estimated[:k], sorted_estimated[k:]
                 
                 phi_k = phi[sorted][k-1]
                 assert phi_k == np.min(phi[top_k])
@@ -95,98 +179,9 @@ class Environment:
                 exclusion = np.max(phi[rest_estimated]) <= phi_k + epsilon
                 num_correct += inclusion and exclusion
                 
-                pbar.set_postfix(topk_real=f"{top_k}", topk_approx=f"{top_k_estimated}", func_calls=f"{func_calls[round]}", accuracy=f"{num_correct/(round+1)}")
-            
-        avg_func_calls = np.mean(func_calls)
-        variance = np.sum((func_calls-avg_func_calls)**2)/(rounds-1)
-        SE_func_calls = np.sqrt(variance/rounds)
-        print(avg_func_calls, SE_func_calls, num_correct/rounds)
+                pbar.set_postfix(topk_real=f"{np.sort(top_k)}", topk_approx=f"{np.sort(top_k_estimated)}", func_calls=f"{func_calls[round]}", accuracy=f"{num_correct/(round+1)}")
         
-        return avg_func_calls, SE_func_calls, num_correct/rounds
+        avg, se = self.average_measure(func_calls)
+        print(avg, se, num_correct/num_experiments)
         
-    
-    def evaluate_order(self, game: Game, algorithm: Algorithm, k: int, step_interval:int=100, rounds:int=100):
-        steps = math.floor(self.T/step_interval)
-        binary = np.zeros((rounds, steps))
-        kendall = np.zeros((rounds, steps))
-        spearman = np.zeros((rounds, steps))
-        for i in range(rounds):
-            game.initialize(n = self.n)
-            algorithm.initialize(game, self.T)
-            algorithm.get_top_k(k, step_interval)
-            
-            phi = np.array([game.get_phi(i) for i in range(self.n)])
-            phi_estimated = np.array(algorithm.values)
-            assert phi_estimated.shape == (steps, self.n), (phi_estimated.shape, (steps, self.n))
-            
-            correct_sorted = np.argsort(phi)
-            estimated_sorted = np.argsort(phi_estimated)
-            
-            spearman[i] = 1 - 6*np.sum((correct_sorted-estimated_sorted)**2, axis=-1)/(self.n*(self.n**2 - 1))
-            
-            binary[i] = np.sum(correct_sorted == estimated_sorted, axis=-1)/self.n
-            orders_real = np.tile(phi.reshape(-1, self.n, 1), (1,1,self.n)) > np.tile(phi, (1, self.n)).reshape(-1,self.n,self.n)
-            orders_pred = np.tile(phi_estimated.reshape(-1, self.n, 1), (1,1,self.n)) > np.tile(phi_estimated, (1, self.n)).reshape(-1,self.n,self.n)
-            num_discordant = np.sum(orders_real != orders_pred, axis=(-1,-2)) / 2
-            kendall[i] = 1 - (4*num_discordant)/(self.n*(self.n-1))
-                
-
-        
-        avg_binary = np.average(binary, axis=0)
-        avg_kendall = np.average(kendall, axis=0)
-        avg_spearman = np.average(spearman, axis=0)
-
-        return avg_binary, avg_kendall, avg_spearman
-    
-    def get_numeric_scale(self, approximated: set, real: set):
-        return approximated.issubset(real)
-    
-    def get_ratio_scale(self, approximated: set, real: set):
-        return len(approximated.intersection(real))/len(approximated)
-    
-    def get_MSE(self, approximated, real):
-        return (real-approximated)**2
-    
-
-class FixedBudgetEnvironment:
-    def __init__(self, n: int, budget: int):
-        self.budget = budget
-        self.n = n
-        
-    def evaluate(self, game: Game, algorithm: Algorithm, K: np.ndarray, rounds:int=100):
-        precisions = np.zeros((rounds, K.shape[0]))
-        epsilons = np.zeros((rounds, K.shape[0]))
-        for i in range(rounds):
-            game.initialize(n = self.n)
-            for index_k, k in enumerate(K):
-                algorithm.initialize(game, self.budget)
-                algorithm.get_top_k(k, step_interval=self.budget)
-                
-                phi = np.array([game.get_phi(i) for i in range(self.n)])
-                phi_estimated = np.array(algorithm.values)
-                sorted_estimated = np.argsort(-phi_estimated)
-                top_k_estimated = sorted_estimated[0, :k]
-                rest_estimated = sorted_estimated[0, k:]
-                
-                relevant_players, candidates, sum_topk = game.get_top_k(k) 
-                num_correct = np.isin(top_k_estimated, relevant_players).sum()
-                num_correct += np.clip(np.isin(top_k_estimated, candidates).sum(), a_min = 0, a_max = k-relevant_players.shape[0])
-                precisions[i, index_k] = num_correct/k
-                
-                
-                #epsilon score
-                border_player_value = np.sort(phi)[-k]
-                lower_epsilon = np.max(border_player_value - phi[top_k_estimated], axis=-1)
-                upper_epsilon = np.max(phi[rest_estimated] - border_player_value, axis=-1)
-                epsilons[i, index_k] = np.max([lower_epsilon, upper_epsilon], axis=-1)
-                assert epsilons[i, index_k] >= 0, (phi, border_player_value, top_k_estimated[-1])
-                
-        avg_prec = np.average(precisions, axis=0)
-        variance_prec = np.sum((precisions-avg_prec)**2, axis=0)/(rounds-1)
-        SE_prec = np.sqrt(variance_prec/rounds)
-        
-        avg_epsilon = np.average(epsilons, axis=0)
-        variance_epsilon = np.sum((epsilons-avg_epsilon)**2, axis=0)/(rounds-1)
-        SE_epsilon = np.sqrt(variance_epsilon/rounds)
-        
-        return K, avg_prec, SE_prec, avg_epsilon, SE_epsilon
+        return avg, se, num_correct/num_experiments

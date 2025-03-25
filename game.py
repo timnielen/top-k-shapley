@@ -10,19 +10,23 @@ class Game:
         '''should be run infront of each experiment in case the selected game contains randomness 
         (such as sampling a random local game in each experiment)'''
         pass
-    def get_phi(self, i: int) -> float:
-        pass
+    def get_phi(self) -> np.ndarray:
+        return self.phi
     def value(self, S) -> float:
         pass
     def get_top_k(self, k: int):
+        '''returns two partitions of players:
+            1. relevant_players: set of h<k players whose shapley values are larger than the border, i.e. must be part of the topk
+            2. candidates: set of all players whose shapley values are equal to the border, any subset of k-h of these may be part of the topk
+        and returns the border value, i.e. the value of the candidates
+        '''
         assert k > 0
-        phi = np.array([self.get_phi(i) for i in range(self.n)])
+        phi = self.get_phi()
         sorted = np.argsort(-phi)
         border = phi[sorted[k-1]]
         relevant_players = sorted[:k-1][phi[sorted[:k-1]] > border]
         candidates = sorted[k-1:][phi[sorted[k-1:]] == border]
-        sum_topk = np.sum(phi[sorted[:k]])
-        return relevant_players, candidates, sum_topk
+        return relevant_players, candidates, border
     
     def reindex(self):
         '''given the dataframe obtained from the game's csv file compute an array containing all coalition values
@@ -110,8 +114,6 @@ class GlobalFeatureImportance(Game):
                 print(index)
         return values
         
-    def get_phi(self, i: int) -> float:
-        return self.phi[i]
     
 class LocalFeatureImportance(Game):
     '''uses precomputed coalition values stored in csv documents'''
@@ -202,6 +204,7 @@ class LocalFeatureImportance(Game):
         return values, games
     
     def get_all_phi(self, all_values):
+        '''calculate the shapley values of all players for each local subgame's csv file  '''
         games = [filename for filename in os.listdir(self.directory) if filename.split(".")[-1] == "csv"]
         game_paths = [f"{self.directory}/{filename}" for filename in games]
         shapley_values_paths = [f"{filepath.split('.')[0]}_shapley_values_phi.npy" for filepath in game_paths]
@@ -223,9 +226,6 @@ class LocalFeatureImportance(Game):
     
     def value(self, S):
         return self.values[coalition_to_index(np.array(S))]
-    
-    def get_phi(self, i: int) -> float:
-        return self.phi[i]
 
 class UnsupervisedFeatureImportance(GlobalFeatureImportance):
     def reindex(self):

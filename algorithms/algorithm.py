@@ -3,6 +3,7 @@ import scipy.stats
 
 class Algorithm:
     def initialize(self, game, budget: int, step_interval: int = 100):
+        '''initialization routine that should be run before every experiment to reset values'''
         self.values = []
         self.game = game
         self.budget = budget # if budget == -1, the budget is unlimited and the algorithm needs to stop itself
@@ -15,20 +16,21 @@ class Algorithm:
 
     def get_top_k(self, k: int):
         '''
-        evaluated the topk players. 
-        The result is an approximation for every players shapley value stored in self.phi 
+        - estimates the topk players
+        - the result is an approximation for every players shapley value stored in self.phi 
         -> can be used for the simple approximation problem aswell
-        The intermediate values are stored in self.values according to self.step_interval.
+        - the intermediate values are stored in self.values according to self.step_interval.
         '''
         pass
 
     def save_steps(self, final=False):
         '''saves the intermediate estimates for the shapley values'''
-        # in case of final = True, i.e. the final save in the end, we save the current values even if total budget is not actually reached. Is neccessary e.g. if an algorithm terminates with func_calls=budget-1
-        if final and self.budget != -1:
-            self.func_calls = self.budget
-        if(self.func_calls/self.step_interval >= len(self.values) + 1):
-            self.values += [np.array(self.phi)]
+        if len(self.values) == self.budget // self.step_interval:
+            return
+        # In the case of final == True, i.e. the final save in the end, we save the current values even if total budget is not actually reached. 
+        # This s neccessary e.g. if an algorithm terminates with func_calls=budget-1
+        if final or self.func_calls/self.step_interval >= len(self.values) + 1:
+            self.values += [self.phi]
     
     def value(self, coalition: np.ndarray):
         # returns the value of a coalition (uses cached values if possible)
@@ -44,24 +46,24 @@ class Algorithm:
         return v
         
     def eval_empty_full(self):
-        # precompute grand and empty coalition values
+        '''precompute grand and empty coalition values'''
         self.func_calls += 2
         self.v_n = self.game.value(np.arange(self.game.n))
         self.v_0 = self.game.value(np.array([]))
         
     def partition(self, k):
-        # returns the current topk and non-topk players
+        '''utility function that returns the current topk and non-topk players'''
         sorted = np.argsort(-self.phi)
         return sorted[:k], sorted[k:]
     
     def update_player(self, player, marginal):
-        # utility function to update a players estimator using a sampled marginal contribution
+        '''utility method to update a players estimator using a sampled marginal contribution'''
         self.phi[player] = (self.t[player] * self.phi[player] + marginal)/(self.t[player] + 1)
         self.t[player] += 1
         self.save_steps(final=False)
 
     def sample(self, player: int):
-        # utility function to sample a coalition S in N \ {player}
+        '''utility function to sample a coalition S in N \ {player}'''
         n = self.game.n
         length = np.random.randint(n)
         S = np.concatenate((np.arange(player), np.arange(player+1, n)))
@@ -85,14 +87,14 @@ class PAC_Algorithm(Algorithm):
         self.rest_high = 2*self.epsilon
     
     def update_player(self, player, marginal):
-        # utility function to update a players estimator using a sampled marginal contribution
+        '''utility method to update a players estimator using a sampled marginal contribution'''
         self.phi[player] = (self.t[player] * self.phi[player] + marginal)/(self.t[player] + 1)
         self.squared_marginals[player] += marginal**2
         self.t[player] += 1
         self.save_steps(self.step_interval)
         
     def update_bounds(self, topk, rest):
-        # update the confidence bounds of all players using the central limit theorem
+        '''utility method to update the confidence bounds of all players using the central limit theorem'''
         if np.any(self.t<self.t_min): # only update if t_min is reached, i.e. CLT is valid
             return
         sigma = np.sqrt((self.squared_marginals-self.t*(self.phi**2))/(self.t-1))
@@ -103,7 +105,10 @@ class PAC_Algorithm(Algorithm):
         self.rest_high = np.max(self.upper_bound[rest]) # largest non-topk bound
             
     def is_PAC(self):
-        # if the maximum overlap of the bounds of the two partitions is at most epsilon, the solution is probably approximately correct
+        '''
+        - returns true, if current solution is probably approximatly correct
+        - this is the case if the maximum overlap of the bounds of the two partitions is at most epsilon
+        '''
         return self.rest_high - self.topk_low <= self.epsilon
     
     
