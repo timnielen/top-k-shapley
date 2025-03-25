@@ -68,12 +68,15 @@ class GlobalFeatureImportance(Game):
         if use_cached:
             try:
                 self.values = np.load(values_path)
+                self.n = np.log2(self.values.shape[0]).astype(np.int32)
+                assert self.n - np.log2(self.values.shape[0]) == 0
             except:
                 print(f"could not find cached values. manual reindexing...")
                 self.df = pd.read_csv(filepath)
+                self.n = np.log2(len(self.df)).astype(np.int32)
+                assert self.n - np.log2(len(self.df)) == 0
                 self.values = self.reindex()
                 np.save(values_path, self.values)
-            
             try:
                 self.phi = np.load(shapley_values_path)
             except:
@@ -83,12 +86,13 @@ class GlobalFeatureImportance(Game):
                 
         else: 
             self.df = pd.read_csv(filepath)
+            self.n = np.log2(len(self.df)).astype(np.int32)
+            assert self.n - np.log2(len(self.df)) == 0
             self.values = self.reindex()
             np.save(values_path, self.values)
             self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
 
-        self.n = np.log2(self.values.shape[0])
         print(self.values, self.n)
         print(self.phi, np.sum(self.phi))
         
@@ -135,9 +139,13 @@ class LocalFeatureImportance(Game):
         if self.use_cached:
             try:
                 self.values = np.load(values_path)
+                self.n = np.log2(self.values.shape[0]).astype(np.int32)
+                assert self.n - np.log2(self.values.shape[0]) == 0
             except:
                 print(f"could not find cached values. manual reindexing...")
                 self.df = pd.read_csv(filepath)
+                self.n = np.log2(len(self.df)).astype(np.int32)
+                assert self.n - np.log2(len(self.df)) == 0
                 self.values = self.reindex(self.df)
                 np.save(values_path, self.values)
             
@@ -149,12 +157,14 @@ class LocalFeatureImportance(Game):
                 np.save(shapley_values_path, self.phi)
                 
         else: 
+            self.df = pd.read_csv(filepath)
+            self.n = np.log2(len(self.df)).astype(np.int32)
+            assert self.n - np.log2(len(self.df)) == 0
             self.values = self.reindex(self.df)
             np.save(values_path, self.values)
             self.phi = self.exact_calculation(self.values)
             np.save(shapley_values_path, self.phi)
         
-        self.n = np.log2(self.values.shape[0])
         
     def reindex(self, df):
         '''given the dataframe obtained from the game's csv file compute an array containing all coalition values
@@ -181,48 +191,6 @@ class LocalFeatureImportance(Game):
             if i%1000 == 0:
                 print(i)
         return values
-    
-    def reindex_all(self):
-        '''reindexes all games' values contained in the game directory (see reindex for details)'''
-        games = [filename for filename in os.listdir(self.directory) if filename.split(".")[-1] == "csv"]
-        game_paths = [f"{self.directory}/{filename}" for filename in games]
-        value_paths = [f"{filepath.split('.')[0]}_values.npy" for filepath in game_paths]
-        values = np.zeros((len(game_paths), 2**self.n))
-        for index, path in enumerate(value_paths):
-            if self.use_cached:
-                try:
-                    values[index] = np.load(path)
-                except:
-                    print(f"could not find cached values. manual reindexing...")
-                    df = pd.read_csv(game_paths[index])
-                    values[index] = self.reindex(df)
-                    np.save(path, values[index])
-            else:
-                df = pd.read_csv(game_paths[index])
-                values[index] = self.reindex(df)
-                np.save(path, values[index])
-        return values, games
-    
-    def get_all_phi(self, all_values):
-        '''calculate the shapley values of all players for each local subgame's csv file  '''
-        games = [filename for filename in os.listdir(self.directory) if filename.split(".")[-1] == "csv"]
-        game_paths = [f"{self.directory}/{filename}" for filename in games]
-        shapley_values_paths = [f"{filepath.split('.')[0]}_shapley_values_phi.npy" for filepath in game_paths]
-        shapley_values = np.zeros((len(game_paths), self.n))
-        for index, path in enumerate(shapley_values_paths):
-            if self.use_cached:
-                try:
-                    shapley_values[index] = np.load(path)
-                except:
-                    print(f"could not find cached shapley values. manual reindexing...")
-                    df = pd.read_csv(game_paths[index])
-                    shapley_values[index] = self.exact_calculation(df, all_values[index])
-                    np.save(path, shapley_values[index])
-            else:
-                df = pd.read_csv(game_paths[index])
-                shapley_values[index] = self.exact_calculation(df, all_values[index])
-                np.save(path, shapley_values[index])
-        return shapley_values, games
     
     def value(self, S):
         return self.values[coalition_to_index(np.array(S))]

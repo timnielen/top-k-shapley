@@ -188,6 +188,8 @@ class CMCS_at_K(CMCS):
             S = self.sample()
             v_S = self.value(S)
             for player in range(n):
+                if self.func_calls == self.budget:
+                    return
                 marginal = self.marginal(S, player, v_S)
                 self.update_player(player, marginal)
         

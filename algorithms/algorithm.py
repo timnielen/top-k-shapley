@@ -30,7 +30,7 @@ class Algorithm:
         # In the case of final == True, i.e. the final save in the end, we save the current values even if total budget is not actually reached. 
         # This s neccessary e.g. if an algorithm terminates with func_calls=budget-1
         if final or self.func_calls/self.step_interval >= len(self.values) + 1:
-            self.values += [self.phi]
+            self.values.append(self.phi.copy())
     
     def value(self, coalition: np.ndarray):
         # returns the value of a coalition (uses cached values if possible)
@@ -40,7 +40,7 @@ class Algorithm:
         elif length == self.game.n:
             v = self.v_n
         else:
-            assert self.func_calls < self.budget or self.budget == -1
+            assert self.func_calls < self.budget or self.budget == -1, self.func_calls
             self.func_calls += 1
             v = self.game.value(coalition)
         return v
@@ -91,7 +91,7 @@ class PAC_Algorithm(Algorithm):
         self.phi[player] = (self.t[player] * self.phi[player] + marginal)/(self.t[player] + 1)
         self.squared_marginals[player] += marginal**2
         self.t[player] += 1
-        self.save_steps(self.step_interval)
+        self.save_steps(final=False)
         
     def update_bounds(self, topk, rest):
         '''utility method to update the confidence bounds of all players using the central limit theorem'''

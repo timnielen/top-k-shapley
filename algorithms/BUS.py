@@ -23,3 +23,5 @@ class BUS(Algorithm):
             S = self.sample(player)
             marginal = self.value(np.concatenate((S, [player]))) - self.value(S)
             self.update_player(player, marginal)
+
+        self.save_steps(final=True)

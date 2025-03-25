@@ -95,13 +95,12 @@ class EvaluationEnvironment:
             game.initialize()
             algorithm.initialize(game, budget, step_interval)
             algorithm.get_top_k(k)
-            assert len(algorithm.values) == steps
+            assert len(algorithm.values) == steps, (len(algorithm.values), steps)
             
             phi = game.get_phi()
             phi_estimated = np.array(algorithm.values) 
 
             mse[experiment] = self.mse(phi, phi_estimated)
-            
             sorted_estimated = np.argsort(-phi_estimated)
             top_k_estimated = sorted_estimated[:, :k]
             rest_estimated = sorted_estimated[:, k:]
