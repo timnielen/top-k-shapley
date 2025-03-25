@@ -20,7 +20,7 @@ def plot(results, labels, measures=["numeric", "ratio", "epsilon", "mse"], save=
     for name, x, result in results:
         for measure, (avg, se) in result.items():
             if not measure in measures:
-                return
+                continue
             axes[measure].plot(x, avg, ".-", label=name, linewidth=2.0)
             axes[measure].fill_between(x, (avg-se), (avg+se), alpha=.3)
     

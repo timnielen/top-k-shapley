@@ -90,7 +90,7 @@ class EvaluationEnvironment:
         ratio_scale = np.zeros((num_experiments, steps))
         epsilons = np.zeros((num_experiments, steps))
         mse = np.zeros((num_experiments, steps))
-        n = game.n
+        
         for experiment in range(num_experiments):
             game.initialize()
             algorithm.initialize(game, budget, step_interval)

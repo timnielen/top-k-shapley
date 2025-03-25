@@ -7,7 +7,7 @@ class GapE(Algorithm):
     def get_top_k(self, k: int):
         assert self.budget != -1, "The algorithm doesn't have an early stopping condition!"
         n = self.game.n
-        actual_phi = np.array([self.game.get_phi(i) for i in range(n)])
+        actual_phi = self.game.get_phi()
         sorted = np.argsort(-actual_phi)
         border = np.zeros(n)
         border[sorted[:k]] = actual_phi[sorted[k]]

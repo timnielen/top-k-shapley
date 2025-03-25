@@ -20,9 +20,12 @@ class SAR(Algorithm):
         num_marginals_pp[0] = 0
         round = 1
         available_players = np.arange(n)
-        while self.func_calls+len(available_players)*(num_marginals_pp[round] - num_marginals_pp[round-1]) <= self.budget and len(topk) < k:
+        while self.func_calls+2 <= self.budget and len(topk) < k:
             for player in available_players:
                 for _ in range((num_marginals_pp[round] - num_marginals_pp[round-1]).astype(np.int32)):
+                    if self.func_calls + 2 > self.budget:
+                        self.save_steps(final=True)
+                        return
                     S = self.sample(player)
                     marginal = self.value(np.concatenate((S, [player]))) - self.value(S)
                     self.update_player(player, marginal)
