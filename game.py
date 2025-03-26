@@ -153,7 +153,7 @@ class LocalFeatureImportance(Game):
                 self.phi = np.load(shapley_values_path)
             except:
                 print(f"could not find cached shapley values. manual calculation...")
-                self.phi = self.exact_calculation(self.values)
+                self.phi = self.exact_calculation()
                 np.save(shapley_values_path, self.phi)
                 
         else: 
@@ -162,7 +162,7 @@ class LocalFeatureImportance(Game):
             assert self.n - np.log2(len(self.df)) == 0
             self.values = self.reindex(self.df)
             np.save(values_path, self.values)
-            self.phi = self.exact_calculation(self.values)
+            self.phi = self.exact_calculation()
             np.save(shapley_values_path, self.phi)
         
         
