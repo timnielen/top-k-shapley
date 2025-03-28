@@ -3,19 +3,19 @@ import math
 import numpy as np
 import time
 
-def plot(results, labels, measures=["numeric", "ratio", "epsilon", "mse"], save=False, filepath=f"results/{time.time()}.pdf"):
+def plot(results, xlabel="budget", measures=["numeric", "ratio", "epsilon", "mse"], save=False, filepath=f"results/{time.time()}.pdf"):
     plt.style.use(plt.style.library['ggplot'])
     plt.rcParams.update({'font.size': 12})
     plt.rcParams['legend.frameon'] = False
     plt.rcParams['lines.markersize'] = 10
-    fig, axes = plt.subplots(1, len(measures), figsize=(len(measures)*8,5), dpi=1000)
+    fig, axes = plt.subplots(1, len(measures), figsize=(len(measures)*8,5), dpi=50)
     if type(axes) != np.ndarray:
         axes = [axes]
     axes = {measure: axes[i] for i, measure in enumerate(measures)}   
 
     for measure in measures:
-        axes[measure].set_xlabel(labels[measure][0])
-        axes[measure].set_ylabel(labels[measure][1])
+        axes[measure].set_xlabel(xlabel)
+        axes[measure].set_ylabel(measure)
 
     for name, x, result in results:
         for measure, (avg, se) in result.items():

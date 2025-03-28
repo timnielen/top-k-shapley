@@ -131,16 +131,15 @@ class EvaluationEnvironment:
             result[measure] = ([], [])
         with tqdm(K) as pbar:
             for k in pbar:
-                _, sub_result = self.evaluate_fixed_k(game, algorithm, k, budget, step_interval=-1, num_experiments=num_experiments)
+                _, sub_result = self.evaluate_fixed_k(game, algorithm, k, budget, step_interval=budget, num_experiments=num_experiments)
                 for measure in measures:
                     avg, se = sub_result[measure]
-                    result[measure][0] += [avg[-1]]
-                    result[measure][1] += [se[-1]]
+                    result[measure][0].append(avg[-1])
+                    result[measure][1].append(se[-1])
                 pbar.set_postfix(k=k)
         for measure in measures:
             avg, se = result[measure]
-            result[measure][0] = np.array(avg)
-            result[measure][1] = np.array(se)
+            result[measure] = (np.array(avg), np.array(se))
             assert np.array(avg).shape == (len(K),)
             assert np.array(se).shape == (len(K),)
         return K, result
