@@ -1,7 +1,3 @@
-Here's a simple README for your GitHub project:
-
----
-
 # Antithetic Sampling for Top-k Shapley Identification
 
 This repository contains the code for the paper **"Antithetic Sampling for Top-k Shapley Identification"**. The project explores algorithms for top-k feature importance in machine learning, using Shapley values and antithetic sampling techniques.
@@ -15,7 +11,7 @@ The main entry points for running the code are the following Python files:
 
 ## Setup
 
-Before running the code, ensure you have the necessary Python dependencies. You can install them using `pip` (a `requirements.txt` file is recommended, but not provided here):
+Before running the code, ensure you have the necessary Python dependencies. You can install them using `pip`
 
 ```bash
 pip install -r requirements.txt
