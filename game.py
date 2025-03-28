@@ -125,6 +125,16 @@ class LocalFeatureImportance(Game):
         self.directory = directory
         self.use_cached = use_cached
         self.name = directory.split('/')[-1]
+        
+        #get the number of players n using an arbitrary subgame
+        games = os.listdir(self.directory)
+        for filename in games:
+            if filename.split(".")[-1] == "csv":
+                filepath = f"{self.directory}/{filename}"
+                df = pd.read_csv(filepath)
+                self.n = np.log2(len(df)).astype(np.int32)
+                assert self.n - np.log2(len(df)) == 0
+                break
 
     def initialize(self):
         '''initializes the game's values by sampling a random local game and reading the corresponding values from disk.

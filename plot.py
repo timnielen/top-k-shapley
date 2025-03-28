@@ -29,4 +29,5 @@ def plot(results, xlabel="budget", measures=["numeric", "ratio", "epsilon", "mse
 
     if save:
         plt.savefig(filepath, bbox_inches='tight')
+    plt.legend(handles, labels, loc="best")
     plt.show()

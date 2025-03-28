@@ -14,17 +14,17 @@ import pandas as pd
 GAME_KIND = "global" # "local", "unsupervised"
 GAME_PATH_GLOBAL = "datasets/global/Bank marketing classification random forest.csv" # path to csv file
 GAME_PATH_UNSUPERVISED = "datasets/unsupervised/vf_BigFive.csv" # path to csv file
-GAME_PATH_LOCAL = "datasets/local/image_classification" # path to directory containing csv files
+GAME_PATH_LOCAL = "datasets/local/adult_classification" # path to directory containing csv files
 USE_CACHED=True # use cached (shapley) values of the games for faster evaluation if possible
 
-TEST_ALGORITHMS = ["CMCS", "compSHAP"]
+TEST_ALGORITHMS = ["CMCS", "compSHAP", "Greedy CMCS"] # the algorithms to be tested; empty list means all algorithms; see ./algorithms/dict.py for all available algorithms
 K=3 # if K=-1 eval all k with fixed budget
 BUDGET=1500
-NUM_EXPERIMENTS=500
+NUM_EXPERIMENTS=1000
 STEP_INTERVAL=50 # budget interval between datapoints 
 
 PLOT=True
-PLOT_SAVE=False
+PLOT_SAVE=True
 PLOT_DIRECTORY="results/plots" # where the plots should be saved
 MEASURES = ["ratio", "epsilon", "mse"] # the measures to be plotted
 
@@ -70,10 +70,16 @@ if __name__ == "__main__":
             
     if PLOT:
         if K>0 and K<=game.n:
-            path = os.path.join(PLOT_DIRECTORY, "fixed_k", f"{GAME_KIND}({game.name})_k={K}_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
+            dir = os.path.join(PLOT_DIRECTORY, "fixed_k")
+            if PLOT_SAVE and not os.path.isdir(dir):
+                os.makedirs(dir)
+            path = os.path.join(dir, f"{GAME_KIND}({game.name})_k={K}_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
             plot(results, "budget", MEASURES, PLOT_SAVE, path)
         elif K==-1:
-            path = os.path.join(PLOT_DIRECTORY, "fixed_budget", f"{GAME_KIND}({game.name})_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
+            dir = os.path.join(PLOT_DIRECTORY, "fixed_budget")
+            if PLOT_SAVE and not os.path.isdir(dir):
+                os.makedirs(dir)
+            path = os.path.join(dir, f"{GAME_KIND}({game.name})_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
             plot(results, "k", MEASURES, PLOT_SAVE, path)
         else:
             raise ValueError("Invalid K!")
