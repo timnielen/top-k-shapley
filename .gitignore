@@ -8,4 +8,4 @@ neuron_shapley/imagenet
 datasets/**/**.npy
 old
 .DS_STORE
-results/data
+results

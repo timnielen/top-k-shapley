@@ -68,7 +68,7 @@ class EvaluationEnvironment:
             se (float array of shape (steps,)): standard error of the average measure at each step obtained through the sample variance
         '''
 
-        num_experiments, steps = measure.shape
+        num_experiments = measure.shape[0]
         average = np.average(measure, axis=0)
         variance = np.sum((measure-average)**2, axis=0)/(num_experiments-1)
         se = np.sqrt(variance/num_experiments)
@@ -156,8 +156,7 @@ class EvaluationEnvironment:
         num_correct = 0
         with tqdm(range(num_experiments)) as pbar:
             for round in pbar:
-                n = game.n
-                game.initialize(n)
+                game.initialize()
                 algorithm.initialize(game, budget=-1, step_interval=-1) #infinite budget
                 algorithm.get_top_k(k)
                 assert len(algorithm.values) == 1

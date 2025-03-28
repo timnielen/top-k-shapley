@@ -15,13 +15,13 @@ GAME_KIND = "global" # "local", "unsupervised"
 GAME_PATH_GLOBAL = "datasets/global/Bank marketing classification random forest.csv" # path to csv file
 GAME_PATH_UNSUPERVISED = "datasets/unsupervised/vf_BigFive.csv" # path to csv file
 GAME_PATH_LOCAL = "datasets/local/image_classification" # path to directory containing csv files
+USE_CACHED=True # use cached (shapley) values of the games for faster evaluation if possible
 
 TEST_ALGORITHMS = ["CMCS", "compSHAP"]
 K=3 # if K=-1 eval all k with fixed budget
 BUDGET=1500
 NUM_EXPERIMENTS=500
 STEP_INTERVAL=50 # budget interval between datapoints 
-USE_CACHED=True # use cached (shapley) values of the games for faster evaluation if possible
 
 PLOT=True
 PLOT_SAVE=False
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                 raise ValueError(f'Unknown algorithm: "{name}"!')
             algorithm = algorithms[name]
             
-            if K>0 and K<=game.n:
+            if K>0 and K<game.n:
                 results.append((name, *env.evaluate_fixed_k(game=game, algorithm=algorithm(), k=K, budget=BUDGET, step_interval=STEP_INTERVAL, num_experiments=NUM_EXPERIMENTS)))
             elif K==-1:
                 results.append((name, *env.evaluate_fixed_budget(game=game, algorithm=algorithm(), K=np.arange(1,game.n), budget=BUDGET, num_experiments=NUM_EXPERIMENTS)))
@@ -70,10 +70,10 @@ if __name__ == "__main__":
             
     if PLOT:
         if K>0 and K<=game.n:
-            path = os.path.join(PLOT_DIRECTORY, "fixed_k", f"{game.__class__.__name__}({game.name})_k={K}_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
+            path = os.path.join(PLOT_DIRECTORY, "fixed_k", f"{GAME_KIND}({game.name})_k={K}_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
             plot(results, "budget", MEASURES, PLOT_SAVE, path)
         elif K==-1:
-            path = os.path.join(PLOT_DIRECTORY, "fixed_budget", f"{game.__class__.__name__}({game.name})_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
+            path = os.path.join(PLOT_DIRECTORY, "fixed_budget", f"{GAME_KIND}({game.name})_budget={BUDGET}_rounds={NUM_EXPERIMENTS}.pdf")
             plot(results, "k", MEASURES, PLOT_SAVE, path)
         else:
             raise ValueError("Invalid K!")
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             xlabel = "budget" if K!=-1 else "K"
             klabel = K if K!=-1 else f"1-{game.n-1}"
             df[xlabel] = x
-            dir = os.path.join(DATA_DIRECTORY, game.__class__.__name__, game.name, f"budget={BUDGET}_rounds={NUM_EXPERIMENTS}", f"k={klabel}")
+            dir = os.path.join(DATA_DIRECTORY, GAME_KIND, game.name, f"budget={BUDGET}_rounds={NUM_EXPERIMENTS}", f"k={klabel}")
             
             for measure, (avg, se) in result.items():
                 df[measure] = avg
